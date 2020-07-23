@@ -79,5 +79,7 @@ bool VideoYUV::read(cv::Mat &dst)
 		}
 	}
 
+	cv::cvtColor(dst, dst, cv::COLOR_YUV2BGR);
+
 	return true;
 }

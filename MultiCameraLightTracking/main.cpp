@@ -7,7 +7,7 @@
 
 int main(int argc, char** argv)
 {
-	std::string cam = "2";
+	std::string cam = "0";
 	std::string sInput = "cam" + cam +"_1920x1080.yuvdist.yuv";
 	std::string sPath = "E:\\_SEQ\\" + cam +"\\";
 	std::string sFrame = "frame";
@@ -34,20 +34,16 @@ int main(int argc, char** argv)
 	cv::namedWindow(sLightThersh2, cv::WINDOW_KEEPRATIO);
 	cv::resizeWindow(sLightThersh2, cv::Size(width / 3, height / 3));
 
-
-
 	int32_t frame_cnt = 0;
 
 	//thresh1
 	video.read(imgFrame);
 	frame_cnt++;
-	cv::cvtColor(imgFrame, imgFrame, cv::COLOR_YUV2BGR);
 	bs::thresholdLights(imgFrame, imgLightThresh1);
 	cv::imshow(sLightThresh1, imgLightThresh1);
 	//thresh2
 	video.read(imgFrame);
 	frame_cnt++;
-	cv::cvtColor(imgFrame, imgFrame, cv::COLOR_YUV2BGR);
 	bs::thresholdLights(imgFrame, imgLightThresh2);
 	cv::imshow(sLightThersh2, imgLightThresh2);
 
@@ -57,6 +53,11 @@ int main(int argc, char** argv)
 	cv::resizeWindow(sLightMask, cv::Size(width / 3, height / 3));
 	cv::imshow(sLightMask, imgLightMask);
 
+	//bulb
+	cv::namedWindow("bulb", cv::WINDOW_KEEPRATIO);
+	cv::resizeWindow("bulb", cv::Size(width / 2, height / 2));
+
+	cv::Point2f pointBulb;
 
 	while (true)
 	{
@@ -64,16 +65,16 @@ int main(int argc, char** argv)
 		if(cv::waitKey(5) == 27) break;
 		if (video.read(imgFrame))
 		{
-			std::cout << frame_cnt << std::endl;
-			frame_cnt++;
-			cv::cvtColor(imgFrame, imgFrame, cv::COLOR_YUV2BGR);
-			cv::imshow(sFrame, imgFrame);
 			cv::waitKey(0);
+			pointBulb = bs::detectLight(imgFrame, imgLightMask);
+			cv::circle(imgFrame, pointBulb, 10, cv::Scalar(0, 0, 255), 3);
+			cv::imshow(sFrame, imgFrame);
 
+			std::cout << frame_cnt << pointBulb << std::endl;
 
+			frame_cnt++;
 		}
 		else return 0;
-
 	}
 
 	cv::waitKey(0);

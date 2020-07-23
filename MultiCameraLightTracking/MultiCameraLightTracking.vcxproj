@@ -147,9 +147,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="processing.cpp" />
     <ClCompile Include="VideoCaptureYUV.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="processing.h" />
     <ClInclude Include="VideoCaptureYUV.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

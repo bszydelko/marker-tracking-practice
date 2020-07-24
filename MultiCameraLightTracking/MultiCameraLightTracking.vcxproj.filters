@@ -21,7 +21,7 @@
     <ClCompile Include="VideoCaptureYUV.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="processing.cpp">
+    <ClCompile Include="LightTracker.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -29,7 +29,7 @@
     <ClInclude Include="VideoCaptureYUV.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="processing.h">
+    <ClInclude Include="LightTracker.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

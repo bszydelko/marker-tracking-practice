@@ -22,6 +22,7 @@ namespace bs
 		int32_t m_b;
 		int32_t m_c;
 
+
 		FrameYUV();
 		FrameYUV(int32_t width, int32_t height, int32_t chromaSubsampling);
 		~FrameYUV();
@@ -40,7 +41,7 @@ namespace bs
 		int32_t m_chromaSubsampling;
 
 		FrameYUV* m_frame;
-
+		int32_t m_numFrames;
 
 	public:
 
@@ -49,6 +50,7 @@ namespace bs
 
 		bool isOpened() { return !m_error; }
 		bool read(cv::Mat& dst);
+		bool read(cv::Mat& dst, int32_t frameNumber);
 		cv::Size getResolution() const;
 	};
 

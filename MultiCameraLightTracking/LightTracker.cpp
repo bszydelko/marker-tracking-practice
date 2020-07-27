@@ -5,8 +5,8 @@ namespace bs
 		: m_video(video)
 	{
 		//initialize windows
-		cv::namedWindow(m_sFrame, cv::WINDOW_KEEPRATIO);
-		cv::resizeWindow(m_sFrame, m_video->getResolution() / 2);
+		cv::namedWindow(m_sCurrentFrame, cv::WINDOW_KEEPRATIO);
+		cv::resizeWindow(m_sCurrentFrame, m_video->getResolution() / 2);
 
 		cv::namedWindow(m_sLightThresh1, cv::WINDOW_KEEPRATIO);
 		cv::resizeWindow(m_sLightThresh1, m_video->getResolution() / 3);
@@ -24,16 +24,16 @@ namespace bs
 	int32_t LightTracker::start()
 	{
 		//thresh1
-		m_video->read(m_imgFrame);
+		m_video->read(m_imgCurrentFrame);
 		m_frameCounter++;
 
-		thresholdLights(m_imgFrame, m_imgLightThresh1);
+		thresholdLights(m_imgCurrentFrame, m_imgLightThresh1);
 		cv::imshow(m_sLightThresh1, m_imgLightThresh1);
 		//thresh2
-		m_video->read(m_imgFrame);
+		m_video->read(m_imgCurrentFrame);
 		m_frameCounter++;
 
-		thresholdLights(m_imgFrame, m_imgLightThresh2);
+		thresholdLights(m_imgCurrentFrame, m_imgLightThresh2);
 		cv::imshow(m_sLightThresh2, m_imgLightThresh2);
 
 		createLightMask(m_imgLightThresh1, m_imgLightThresh2, m_imgLightMask);
@@ -43,12 +43,12 @@ namespace bs
 		{
 
 			if (cv::waitKey(5) == 27) break;
-			if (m_video->read(m_imgFrame))
+			if (m_video->read(m_imgCurrentFrame))
 			{
-				//cv::waitKey(0);
-				m_bulbPos = detectLight(m_imgFrame, m_imgLightMask);
-				cv::circle(m_imgFrame, m_bulbPos, 10, cv::Scalar(0, 255, 0), 3);
-				cv::imshow(m_sFrame, m_imgFrame);
+				cv::waitKey(0);
+				m_bulbPos = detectLight(m_imgCurrentFrame, m_imgLightMask);
+				cv::circle(m_imgCurrentFrame, m_bulbPos, 10, cv::Scalar(0, 255, 0), 3);
+				cv::imshow(m_sCurrentFrame, m_imgCurrentFrame);
 
 				std::cout << m_frameCounter << m_bulbPos << std::endl;
 
@@ -60,19 +60,19 @@ namespace bs
 
 	LightTracker::~LightTracker()
 	{
-		
+
 	}
 
 	void LightTracker::thresholdLights(const cv::Mat& frame, cv::Mat& imgThresh)
 	{
-		cv::Mat kernel_dilate = cv::getStructuringElement(cv::MORPH_DILATE, cv::Size(9, 9));
-		//cv::Mat kernel_erode = cv::getStructuringElement()
+		m_kernelDilate_thresholdLights = cv::getStructuringElement(cv::MORPH_DILATE, cv::Size(9, 9));
+		//cv::Mat m_kernelErode_detectLight = cv::getStructuringElement()
 
-		const int32_t thresh = 210;
+		m_thresh_thresholdLights = 210;
 		cv::cvtColor(frame, imgThresh, cv::COLOR_BGR2GRAY);
 		cv::blur(imgThresh, imgThresh, cv::Size(9, 9));
-		cv::dilate(imgThresh, imgThresh, kernel_dilate);
-		cv::threshold(imgThresh, imgThresh, thresh, 255, cv::THRESH_TOZERO);
+		cv::dilate(imgThresh, imgThresh, m_kernelDilate_thresholdLights);
+		cv::threshold(imgThresh, imgThresh, m_thresh_thresholdLights, 255, cv::THRESH_TOZERO);
 	}
 
 	void LightTracker::createLightMask(const cv::Mat& frame1, const cv::Mat& frame2, cv::Mat& mask)
@@ -82,54 +82,76 @@ namespace bs
 
 	cv::Point2f LightTracker::detectLight(const cv::Mat& frame, const cv::Mat& mask)
 	{
-		int32_t x = 0, y = 0;
-		cv::Mat imgThresh;
-		cv::Mat imgBulb;
-		cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11, 11));
+		m_kernelDilate_detectLight = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11, 11));
 
-		thresholdLights(frame, imgThresh);
-		cv::absdiff(imgThresh, mask, imgBulb);
-		cv::GaussianBlur(imgBulb, imgBulb, cv::Size(3, 3), 0);
-		cv::threshold(imgBulb, imgBulb, 220, 255, cv::THRESH_BINARY);
-		cv::dilate(imgBulb, imgBulb, kernel);
+		thresholdLights(frame, m_imgThresh_detectLight);
+		cv::absdiff(m_imgThresh_detectLight, mask, m_imgBulb_detectLight);
+		cv::GaussianBlur(m_imgBulb_detectLight, m_imgBulb_detectLight, cv::Size(3, 3), 0);
+		cv::threshold(m_imgBulb_detectLight, m_imgBulb_detectLight, 220, 255, cv::THRESH_BINARY);
+		cv::dilate(m_imgBulb_detectLight, m_imgBulb_detectLight, m_kernelDilate_detectLight);
 
-		cv::imshow(m_sBulb, imgBulb);
+		cv::imshow(m_sBulb, m_imgBulb_detectLight);
+	
+		//check if bulb overlaps with another light source
+		//check if another object cover mask
 
-		//moments
-		cv::Mat imgCanny;
-		std::vector<std::vector<cv::Point>> contours;
-		std::vector<cv::Vec4i> hierarchy;
 
-		cv::Canny(imgBulb, imgCanny, 50, 150, 3);
-		cv::findContours(imgCanny, contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE, cv::Point(0, 0));
 
-		std::vector<cv::Moments> mu(contours.size());
 
-		for (int i = 0; i < contours.size(); i++)
+		//contours
+	
+		cv::Canny(
+			m_imgBulb_detectLight, 
+			m_imgCanny_detectLight, 50, 150, 3);
+		cv::findContours(
+			m_imgCanny_detectLight, 
+			m_vecContours_detectLight, 
+			m_vecHierarchy_detectLight, 
+			cv::RETR_TREE, 
+			cv::CHAIN_APPROX_SIMPLE, 
+			cv::Point(0, 0));
+
+		m_vecMoments_detectLight.clear();
+		m_vecMoments_detectLight.reserve(m_vecContours_detectLight.size());
+		m_vecCentralMoments_detectLight.clear();
+		m_vecCentralMoments_detectLight.reserve(m_vecContours_detectLight.size());
+		
+
+		for (int i = 0; i < m_vecContours_detectLight.size(); i++)
 		{
-			mu[i] = cv::moments(contours[i], false);
+			m_vecMoments_detectLight[i] = 
+				cv::moments(m_vecContours_detectLight[i], false); 		//moments for each blob / contour
+			m_vecCentralMoments_detectLight[i] = 
+				cv::Point2f(											//center of each blob / contour
+					m_vecMoments_detectLight[i].m10 / m_vecMoments_detectLight[i].m00, 
+					m_vecMoments_detectLight[i].m01 / m_vecMoments_detectLight[i].m00); 		
 		}
 
-		std::vector<cv::Point2f> mc(contours.size());
+		cv::Mat drawing(m_imgCanny_detectLight.size(), CV_8UC3, cv::Scalar(255, 255, 255));
+		cv::Scalar color = cv::Scalar(167, 151, 0);
 
-		for (int i = 0; i < contours.size(); i++)
+		for (int i = 0; i < m_vecContours_detectLight.size(); i++)
 		{
-			mc[i] = cv::Point2f(mu[i].m10 / mu[i].m00, mu[i].m01 / mu[i].m00);
+			cv::drawContours(drawing, m_vecContours_detectLight, i, color, 2, 8, m_vecHierarchy_detectLight, 0, cv::Point());
+			cv::circle(drawing, m_vecCentralMoments_detectLight[i], 4, -1, 0);
 		}
 
-		cv::Mat drawing(imgCanny.size(), CV_8UC3, cv::Scalar(255, 255, 255));
+		cv::Point2f retPoint;
 
-		for (int i = 0; i < contours.size(); i++)
+		if (m_vecContours_detectLight.size() == 1)
 		{
-			cv::Scalar color = cv::Scalar(167, 151, 0);
-			cv::drawContours(drawing, contours, i, color, 2, 8, hierarchy, 0, cv::Point());
-			cv::circle(drawing, mc[i], 4, -1, 0);
-
 
 		}
 
 		cv::imshow("drawing", drawing);
 
+
+
+
+
+
 		//return cv::Point2f(m.m10 / m.m00, m.m01 / m.m00);
+		return cv::Point(0, 0);
 	}
+	
 }

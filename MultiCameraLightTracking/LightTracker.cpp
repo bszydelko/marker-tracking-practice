@@ -118,8 +118,8 @@ namespace bs
 			m_imgCanny_detectBulb, 
 			m_vecContours_detectBulb, 
 			m_vecHierarchy_detectBulb, 
-			cv::RETR_LIST, 
-			cv::CHAIN_APPROX_SIMPLE, 
+			cv::RETR_EXTERNAL, 
+			cv::CHAIN_APPROX_NONE, 
 			cv::Point(0, 0));
 
 		m_vecMoments_detectBulb.clear();
@@ -145,6 +145,7 @@ namespace bs
 		if (m_vecContours_detectBulb.size() == 1)
 		{
 			bool tmp = bulbVsMask(m_vecContours_detectBulb[0], mask);  
+			std::cout << "bulbVSmask: " << tmp << std::endl;
 			retPoint = m_vecCentralMoments_detectBulb[0];
 			m_vecBulbs.emplace_back(bs::Bulb(retPoint, m_frameCounter));
 			m_vecBulbs.back().setMotion(&prevBulb);
@@ -243,7 +244,7 @@ namespace bs
 	{
 		for (const auto& bC : bulbContour)
 		{
-			if (mask.at<uint8_t>(bC) == 255) 
+			if (mask.at<uint8_t>(bC) >= 1) 
 				return true;
 		}
 		return false;

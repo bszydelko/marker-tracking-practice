@@ -2,6 +2,7 @@
 #include <string>
 #include <opencv2/opencv.hpp>
 #include "VideoCaptureYUV.h"
+#include <vector>
 
 namespace bs
 {

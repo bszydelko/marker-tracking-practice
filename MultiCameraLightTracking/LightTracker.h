@@ -18,6 +18,8 @@ namespace bs
 
 		Bulb(cv::Point2d& pos, int32_t frameNumber, bool visible = true);
 		void setMotion(const bs::Bulb* b);
+
+		friend std::ostream & operator << ( std::ostream &out,const Bulb &b);
 	
 	};
 
@@ -78,9 +80,8 @@ namespace bs
 		void createLightMask(const cv::Mat& frame1, const cv::Mat& frame2, cv::Mat& mask);
 		cv::Point2d detectBulb(const cv::Mat& frame, const cv::Mat& mask);
 		cv::Point2d detectBulbInFirstFrame(const cv::Mat& frame, const cv::Mat& mask);
-		bool objectVsMask(const cv::Mat& frame, const cv::Mat& mask);
 		bool bulbVsMask(const std::vector<cv::Point>& bulbContour, const cv::Mat& mask);
-		cv::Point2d predictBulbPos(bs::Bulb& b);
+		cv::Point2d predictNextBulbPosition();
 		void imshow(
 			bool previousFrame,
 			bool currentFrame, 

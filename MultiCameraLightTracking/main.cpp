@@ -11,8 +11,8 @@ int main(int argc, char** argv) //TODO - provide support for handling main param
 
 	std::string sCamNum = "0";
 	std::string sFilename = "cam" + sCamNum + "_1920x1080.yuvdist.yuv";
-	//std::string sPath = "E:\\_SEQ\\" + sCamNum +"\\";
-	std::string sPath = "";
+	std::string sPath = "E:\\_SEQ\\" + sCamNum +"\\";
+	//std::string sPath = "";
 
 	int32_t width = 1920;
 	int32_t height = 1080;

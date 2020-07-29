@@ -82,6 +82,7 @@ namespace bs
 		cv::Point2d detectBulbInFirstFrame(const cv::Mat& frame, const cv::Mat& mask);
 		bool bulbVsMask(const std::vector<cv::Point>& bulbContour, const cv::Mat& mask);
 		cv::Point2d predictNextBulbPosition();
+		template<typename T> int sign(T val);
 		void imshow(
 			bool previousFrame,
 			bool currentFrame, 
@@ -108,5 +109,11 @@ namespace bs
 		BULB_OUT_OF_FRAME,
 		BULB_OVERLAPS_MASK,
 	};
+
+	template<typename T>
+	inline int LightTracker::sign(T val)
+	{
+		return (T(0) < val) - (val < T(0));
+	}
 
 }

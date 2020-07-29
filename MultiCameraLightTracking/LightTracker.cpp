@@ -187,6 +187,7 @@ namespace bs
 		}
 		else if (m_vecContours_detectBulb.size() > 1) //choose biggest
 		{
+			//find blob by predicted point
 			double area1 = 0.0;
 			double area2 = 0.0;
 			int idx = 0;
@@ -301,37 +302,55 @@ namespace bs
 			}
 			return sum / numPositions;
 		};
+		auto avgVelocity = [&](int numPositions)
+		{
+			double sum = 0.0;
+			for (auto it = m_vecBulbs.end(); it > m_vecBulbs.end() - numPositions; it--)
+			{
+				sum += it->m_velocity;
+			}
+			return sum / numPositions;
+		};
+		
+		
 
 		if (numPositions == 0) return cv::Point2d(-1, -1);
 		else if (numPositions == 1) return m_vecBulbs[0].m_position;
 		else if (numPositions == 2)
 		{
 			
-			cv::Vec2d avgVelocity = avgDirection(numPositions);
+			cv::Vec2d avgDir = avgDirection(numPositions);
+			double avgVel = avgVelocity(numPositions);
+
 			double deltaX = m_vecBulbs[numPositions - 1].m_position.x - m_vecBulbs[numPositions - 2].m_position.x;
 			double deltaY = m_vecBulbs[numPositions - 1].m_position.y - m_vecBulbs[numPositions - 2].m_position.y;
+			
 
-			predictedPosition.x = m_vecBulbs.back().m_position.x + deltaX + avgVelocity[0];// +m_vecBulbs.back().m_direction[0];
-			predictedPosition.y = m_vecBulbs.back().m_position.y + deltaY + avgVelocity[1];// +m_vecBulbs.back().m_direction[1];
+			predictedPosition.x = m_vecBulbs.back().m_position.x + deltaX;// +avgDir[0] + (avgVel * sign(avgDir[0]));
+			predictedPosition.y = m_vecBulbs.back().m_position.y + deltaY;// +avgDir[1] + (avgVel * sign(avgDir[1]));
 			
 		}
 		else if (numPositions == 3)
 		{
 			cv::Vec2d avgDir = avgDirection(numPositions);
+			double avgVel = avgVelocity(numPositions);
+
 			double sumOfXChanges = ((m_vecBulbs[numPositions - 1].m_position.x - m_vecBulbs[numPositions - 2].m_position.x) * 2) +
 				((m_vecBulbs[numPositions - 2].m_position.x - m_vecBulbs[numPositions -  3].m_position.x) * 1);
 			double deltaX = sumOfXChanges / 3.0;
 			double sumOfYChanges = ((m_vecBulbs[numPositions - 1].m_position.y - m_vecBulbs[numPositions - 2].m_position.y) * 2) +
 				((m_vecBulbs[numPositions - 2].m_position.y - m_vecBulbs[numPositions - 3].m_position.y) * 1);
 			double deltaY = sumOfYChanges / 3.0;
+			
 
-
-			predictedPosition.x = m_vecBulbs.back().m_position.x + deltaX + avgDir[0];
-			predictedPosition.y = m_vecBulbs.back().m_position.y + deltaY + avgDir[1];
+			predictedPosition.x = m_vecBulbs.back().m_position.x + deltaX;// +avgDir[0] + (avgVel * sign(avgDir[0]));
+			predictedPosition.y = m_vecBulbs.back().m_position.y + deltaY;// +avgDir[1] + (avgVel * sign(avgDir[1]));
 		}
 		else
 		{
 			cv::Vec2d avgDir = avgDirection(numPositions);
+			double avgVel = avgVelocity(numPositions);
+
 			double sumOfXChanges = ((m_vecBulbs[numPositions - 1].m_position.x - m_vecBulbs[numPositions - 2].m_position.x) * 3) +
 				((m_vecBulbs[numPositions - 2].m_position.x - m_vecBulbs[numPositions - 3].m_position.x) * 2) +
 				((m_vecBulbs[numPositions - 3].m_position.x - m_vecBulbs[numPositions - 4].m_position.x) * 1);
@@ -340,15 +359,17 @@ namespace bs
 				((m_vecBulbs[numPositions - 2].m_position.y - m_vecBulbs[numPositions - 3].m_position.y) * 2) +
 				((m_vecBulbs[numPositions - 3].m_position.y - m_vecBulbs[numPositions - 4].m_position.y) * 1);
 			double deltaY = sumOfYChanges / 6.0;
+			
 
-
-			predictedPosition.x = m_vecBulbs.back().m_position.x + deltaX + avgDir[0];
-			predictedPosition.y = m_vecBulbs.back().m_position.y + deltaY + avgDir[1];
+			predictedPosition.x = m_vecBulbs.back().m_position.x + deltaX;// +avgDir[0] + (avgVel * sign(avgDir[0]));
+			predictedPosition.y = m_vecBulbs.back().m_position.y + deltaY;// +avgDir[1] + (avgVel * sign(avgDir[1]));
 		}
 
 
 		return cv::Point2d(predictedPosition);
 	}
+	
+	
 
 
 	void LightTracker::imshow(

@@ -28,8 +28,6 @@ namespace bs
 		m_kernelDilate_thresholdLights = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5));
 		m_kernelDilate_detectBulb = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11, 11));
 
-
-
 	}
 
 	int32_t LightTracker::start()
@@ -79,7 +77,7 @@ namespace bs
 			std::cout << m_frameCounter << m_bulbPos << std::endl;
 
 			m_imgCurrentFrame.copyTo(m_imgPreviousFrame);
-			cv::waitKey(0);
+			//cv::waitKey(0);
 
 		}
 
@@ -170,28 +168,23 @@ namespace bs
 		std::cout << prevBulb;
 		cv::Point2d retPoint;
 
-		cv::Point2d predictedPosition = predictNextBulbPosition();
+		cv::Point2d predictedPosition = predictAverage();
 		cv::drawMarker(m_imgCurrentFrame, predictedPosition, cv::Scalar(0, 0, 255), cv::MARKER_CROSS, 20, 3);
-		cv::imshow(m_sCurrentFrame, m_imgCurrentFrame);
-		cv::waitKey(0);
 
-		if (m_vecContours_detectBulb.size() == 1)
+		
+
+		if (m_vecContours_detectBulb.size() == 0)
 		{
-			bool bulbOnMask = bulbVsMask(m_vecContours_detectBulb[0], mask);  
-			std::cout << "bulbVSmask: " << bulbOnMask << std::endl;
-
-			retPoint = m_vecCentralMoments_detectBulb[0];
-			m_vecBulbs.emplace_back(bs::Bulb(retPoint, m_frameCounter));
-			m_vecBulbs.back().setMotion(&prevBulb);
-
+			retPoint = cv::Point(0, 0);
+			m_vecBulbs.emplace_back(bs::Bulb(predictedPosition, m_frameCounter, false));
 		}
-		else if (m_vecContours_detectBulb.size() > 1) //choose biggest
+		else
 		{
 			//find blob by predicted point
 			double area1 = 0.0;
 			double area2 = 0.0;
 			int idx = 0;
-			
+
 			area1 = cv::contourArea(m_vecContours_detectBulb[0]);
 			retPoint = m_vecCentralMoments_detectBulb[0];
 
@@ -203,39 +196,32 @@ namespace bs
 					idx = i;
 				}
 			}
-			
+
 			bool bulbOnMask = bulbVsMask(m_vecContours_detectBulb[idx], mask);
 			std::cout << "bulbVSmask: " << bulbOnMask << std::endl;
 			m_vecBulbs.emplace_back(bs::Bulb(retPoint, m_frameCounter));
 			m_vecBulbs.back().setMotion(&prevBulb);
 
 		}
-		else 
-		{
-			retPoint = cv::Point(0, 0);
-			m_vecBulbs.emplace_back(bs::Bulb(predictedPosition, m_frameCounter, false));
-		}
-
-		
 
 		return retPoint;
 	}
 
 	cv::Point2d LightTracker::detectBulbInFirstFrame(const cv::Mat& frame, const cv::Mat& mask)
 	{
-		cv::Mat frame_thresh;
-		cv::Mat frame_bulb;
+		cv::Mat								frame_thresh;
+		cv::Mat								frame_bulb;
 		cv::Mat								frame_canny;
 		std::vector<std::vector<cv::Point>> vecContours;
 		std::vector<cv::Vec4i>				vecHierarchy;
 		std::vector<cv::Moments>			vecMoments;
 		std::vector<cv::Point2f>			vecCentralMoments;
 
-		thresholdLights(frame, frame_thresh);
-		cv::absdiff(frame_thresh, mask, frame_bulb);
+		thresholdLights	(frame, frame_thresh);
+		cv::absdiff		(frame_thresh, mask, frame_bulb);
 		cv::GaussianBlur(frame_bulb, frame_bulb, cv::Size(3, 3), 0);
-		cv::threshold(frame_bulb, frame_bulb, 220, 255, cv::THRESH_BINARY);
-		cv::dilate(frame_bulb, frame_bulb, m_kernelDilate_detectBulb);
+		cv::threshold	(frame_bulb, frame_bulb, 220, 255, cv::THRESH_BINARY);
+		cv::dilate		(frame_bulb, frame_bulb, m_kernelDilate_detectBulb);
 
 		cv::Canny(
 			frame_bulb,
@@ -289,87 +275,57 @@ namespace bs
 		return false;
 	}
 
-	cv::Point2d LightTracker::predictNextBulbPosition()
+	cv::Point2d LightTracker::predictAverage()
 	{
 		cv::Point2d predictedPosition;
-		int numPositions = m_vecBulbs.size();
-		auto avgDirection = [&](int numPositions)
-		{
-			cv::Vec2d sum(0,0);
-			for (auto it = m_vecBulbs.end(); it > m_vecBulbs.end() - numPositions; it--)
-			{
-				sum += it->m_direction;
-			}
-			return sum / numPositions;
-		};
-		auto avgVelocity = [&](int numPositions)
-		{
-			double sum = 0.0;
-			for (auto it = m_vecBulbs.end(); it > m_vecBulbs.end() - numPositions; it--)
-			{
-				sum += it->m_velocity;
-			}
-			return sum / numPositions;
-		};
+		int frames = m_vecBulbs.size();
 		
-		
-
-		if (numPositions == 0) return cv::Point2d(-1, -1);
-		else if (numPositions == 1) return m_vecBulbs[0].m_position;
-		else if (numPositions == 2)
+		if (frames == 0) return cv::Point2d(-1, -1);
+		else if (frames == 1) return m_vecBulbs[0].m_position;
+		else if (frames == 2)
 		{
-			
-			cv::Vec2d avgDir = avgDirection(numPositions);
-			double avgVel = avgVelocity(numPositions);
+			double deltaX = m_vecBulbs[frames - 1].m_position.x - m_vecBulbs[frames - 2].m_position.x;
+			double deltaY = m_vecBulbs[frames - 1].m_position.y - m_vecBulbs[frames - 2].m_position.y;
 
-			double deltaX = m_vecBulbs[numPositions - 1].m_position.x - m_vecBulbs[numPositions - 2].m_position.x;
-			double deltaY = m_vecBulbs[numPositions - 1].m_position.y - m_vecBulbs[numPositions - 2].m_position.y;
-			
-
-			predictedPosition.x = m_vecBulbs.back().m_position.x + deltaX;// +avgDir[0] + (avgVel * sign(avgDir[0]));
-			predictedPosition.y = m_vecBulbs.back().m_position.y + deltaY;// +avgDir[1] + (avgVel * sign(avgDir[1]));
-			
+			predictedPosition.x = m_vecBulbs.back().m_position.x + deltaX;
+			predictedPosition.y = m_vecBulbs.back().m_position.y + deltaY;
 		}
-		else if (numPositions == 3)
+		else if (frames == 3)
 		{
-			cv::Vec2d avgDir = avgDirection(numPositions);
-			double avgVel = avgVelocity(numPositions);
+			double sumOfXChanges = 
+				((m_vecBulbs[frames - 1].m_position.x - m_vecBulbs[frames - 2].m_position.x) * 2) +
+				((m_vecBulbs[frames - 2].m_position.x - m_vecBulbs[frames - 3].m_position.x) * 1);
+			
+			double sumOfYChanges = 
+				((m_vecBulbs[frames - 1].m_position.y - m_vecBulbs[frames - 2].m_position.y) * 2) +
+				((m_vecBulbs[frames - 2].m_position.y - m_vecBulbs[frames - 3].m_position.y) * 1);
 
-			double sumOfXChanges = ((m_vecBulbs[numPositions - 1].m_position.x - m_vecBulbs[numPositions - 2].m_position.x) * 2) +
-				((m_vecBulbs[numPositions - 2].m_position.x - m_vecBulbs[numPositions -  3].m_position.x) * 1);
 			double deltaX = sumOfXChanges / 3.0;
-			double sumOfYChanges = ((m_vecBulbs[numPositions - 1].m_position.y - m_vecBulbs[numPositions - 2].m_position.y) * 2) +
-				((m_vecBulbs[numPositions - 2].m_position.y - m_vecBulbs[numPositions - 3].m_position.y) * 1);
 			double deltaY = sumOfYChanges / 3.0;
 			
-
-			predictedPosition.x = m_vecBulbs.back().m_position.x + deltaX;// +avgDir[0] + (avgVel * sign(avgDir[0]));
-			predictedPosition.y = m_vecBulbs.back().m_position.y + deltaY;// +avgDir[1] + (avgVel * sign(avgDir[1]));
+			predictedPosition.x = m_vecBulbs.back().m_position.x + deltaX;
+			predictedPosition.y = m_vecBulbs.back().m_position.y + deltaY;
 		}
 		else
 		{
-			cv::Vec2d avgDir = avgDirection(numPositions);
-			double avgVel = avgVelocity(numPositions);
-
-			double sumOfXChanges = ((m_vecBulbs[numPositions - 1].m_position.x - m_vecBulbs[numPositions - 2].m_position.x) * 3) +
-				((m_vecBulbs[numPositions - 2].m_position.x - m_vecBulbs[numPositions - 3].m_position.x) * 2) +
-				((m_vecBulbs[numPositions - 3].m_position.x - m_vecBulbs[numPositions - 4].m_position.x) * 1);
-			double deltaX = sumOfXChanges / 6.0;
-			double sumOfYChanges = ((m_vecBulbs[numPositions - 1].m_position.y - m_vecBulbs[numPositions - 2].m_position.y) * 3) +
-				((m_vecBulbs[numPositions - 2].m_position.y - m_vecBulbs[numPositions - 3].m_position.y) * 2) +
-				((m_vecBulbs[numPositions - 3].m_position.y - m_vecBulbs[numPositions - 4].m_position.y) * 1);
-			double deltaY = sumOfYChanges / 6.0;
+			double sumOfXChanges = 
+				((m_vecBulbs[frames - 1].m_position.x - m_vecBulbs[frames - 2].m_position.x) * 4) +
+				((m_vecBulbs[frames - 2].m_position.x - m_vecBulbs[frames - 3].m_position.x) * 2) +
+				((m_vecBulbs[frames - 3].m_position.x - m_vecBulbs[frames - 4].m_position.x) * 1);
 			
+			double sumOfYChanges = 
+				((m_vecBulbs[frames - 1].m_position.y - m_vecBulbs[frames - 2].m_position.y) * 4) +
+				((m_vecBulbs[frames - 2].m_position.y - m_vecBulbs[frames - 3].m_position.y) * 2) +
+				((m_vecBulbs[frames - 3].m_position.y - m_vecBulbs[frames - 4].m_position.y) * 1);
 
-			predictedPosition.x = m_vecBulbs.back().m_position.x + deltaX;// +avgDir[0] + (avgVel * sign(avgDir[0]));
-			predictedPosition.y = m_vecBulbs.back().m_position.y + deltaY;// +avgDir[1] + (avgVel * sign(avgDir[1]));
+			double deltaX = sumOfXChanges / 6.0;
+			double deltaY = sumOfYChanges / 6.0;
+
+			predictedPosition.x = m_vecBulbs.back().m_position.x + deltaX;
+			predictedPosition.y = m_vecBulbs.back().m_position.y + deltaY;
 		}
-
-
 		return cv::Point2d(predictedPosition);
 	}
-	
-	
 
 
 	void LightTracker::imshow(
@@ -381,18 +337,18 @@ namespace bs
 		bool bulb, 
 		bool contoursMoments)
 	{
-		if (previousFrame) cv::imshow(m_sPreviousFrame, m_imgPreviousFrame);
-		else cv::destroyWindow(m_sPreviousFrame);
+		if (previousFrame)	cv::imshow(m_sPreviousFrame, m_imgPreviousFrame);
+		else				cv::destroyWindow(m_sPreviousFrame);
 		if (currentFrame)	cv::imshow(m_sCurrentFrame, m_imgCurrentFrame);
-		else cv::destroyWindow(m_sCurrentFrame);
+		else				cv::destroyWindow(m_sCurrentFrame);
 		if (lightThresh1)	cv::imshow(m_sLightThresh1, m_imgLightThresh1);
-		else cv::destroyWindow(m_sLightThresh1);
+		else				cv::destroyWindow(m_sLightThresh1);
 		if (lightThresh2)	cv::imshow(m_sLightThresh2, m_imgLightThresh2);
-		else cv::destroyWindow(m_sLightThresh2);
+		else				cv::destroyWindow(m_sLightThresh2);
 		if (lightMask) 		cv::imshow(m_sLightMask, m_imgLightMask);
-		else cv::destroyWindow(m_sLightMask);
+		else				cv::destroyWindow(m_sLightMask);
 		if (bulb)			cv::imshow(m_sBulb, m_imgBulb_detectBulb);
-		else cv::destroyWindow(m_sBulb);
+		else				cv::destroyWindow(m_sBulb);
 		if (contoursMoments)
 		{
 			m_imgContoursMoments = cv::Mat(m_imgCanny_detectBulb.size(), CV_8UC3, cv::Scalar(255, 255, 255));
@@ -405,7 +361,7 @@ namespace bs
 			}
 			cv::imshow(m_sContoursMoments, m_imgContoursMoments);
 		}
-		else cv::destroyWindow(m_sContoursMoments);
+		else				cv::destroyWindow(m_sContoursMoments);
 	}
 	
 	

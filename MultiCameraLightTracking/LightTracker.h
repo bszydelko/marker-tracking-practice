@@ -61,12 +61,14 @@ namespace bs
 		cv::Mat m_imgBulb_detectBulb;
 		cv::Mat m_kernelDilate_detectBulb;
 		cv::Mat m_kernelErode_detectBulb;
+		int32_t m_notDetectCount{ 0 };
 
 		cv::Mat								m_imgCanny_detectBulb;
 		std::vector<std::vector<cv::Point>> m_vecContours_detectBulb;
 		std::vector<cv::Vec4i>				m_vecHierarchy_detectBulb;
 		std::vector<cv::Moments>			m_vecMoments_detectBulb;
 		std::vector<cv::Point2d>			m_vecCentralMoments_detectBulb;
+		
 
 
 	public:
@@ -78,11 +80,13 @@ namespace bs
 	protected:
 		void thresholdLights(const cv::Mat& frame, cv::Mat& imgThresh);
 		void createLightMask(const cv::Mat& frame1, const cv::Mat& frame2, cv::Mat& mask);
+
 		cv::Point2d detectBulb(const cv::Mat& frame, const cv::Mat& mask);
 		cv::Point2d detectBulbInFirstFrame(const cv::Mat& frame, const cv::Mat& mask);
+
 		bool bulbVsMask(const std::vector<cv::Point>& bulbContour, const cv::Mat& mask);
-		cv::Point2d predictNextBulbPosition();
-		template<typename T> int sign(T val);
+
+		cv::Point2d predictAverage();
 		void imshow(
 			bool previousFrame,
 			bool currentFrame, 
@@ -109,11 +113,5 @@ namespace bs
 		BULB_OUT_OF_FRAME,
 		BULB_OVERLAPS_MASK,
 	};
-
-	template<typename T>
-	inline int LightTracker::sign(T val)
-	{
-		return (T(0) < val) - (val < T(0));
-	}
 
 }

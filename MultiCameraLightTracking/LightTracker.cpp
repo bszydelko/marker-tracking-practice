@@ -1,4 +1,5 @@
 #include "LightTracker.h"
+#define WAIT_TIME 0
 namespace bs
 {
 	LightTracker::LightTracker(bs::VideoCaptureYUV* video)
@@ -49,8 +50,8 @@ namespace bs
 		cv::Point2d bulbFirstPos = detectBulbInFirstFrame(m_imgFirstBulbFrame, m_imgLightMask);
 		m_vecBulbs.emplace_back(bs::Bulb(bulbFirstPos, m_frameCounter));
 
-		cv::circle(m_imgFirstBulbFrame, bulbFirstPos, 10, cv::Scalar(234, 247, 29), 3);
-		cv::imshow("first bulb pos", m_imgFirstBulbFrame);
+		//cv::circle(m_imgFirstBulbFrame, bulbFirstPos, 10, cv::Scalar(234, 247, 29), 3);
+		//cv::imshow("first bulb pos", m_imgFirstBulbFrame);
 		m_imgFirstBulbFrame.copyTo(m_imgPreviousFrame);
 	
 		//imshow triggers
@@ -64,6 +65,7 @@ namespace bs
 
 		while (m_video->read(m_imgCurrentFrame))
 		{
+			m_imgCurrentFrame.copyTo(m_imgRawFrame);
 			m_frameCounter++;
 
 			if (cv::waitKey(5) == 27) break;
@@ -77,7 +79,7 @@ namespace bs
 			std::cout << m_frameCounter << m_bulbPos << std::endl;
 
 			m_imgCurrentFrame.copyTo(m_imgPreviousFrame);
-			//cv::waitKey(0);
+			cv::waitKey(WAIT_TIME);
 
 		}
 
@@ -165,46 +167,180 @@ namespace bs
 		}
 
 		bs::Bulb prevBulb = m_vecBulbs.back();
-		std::cout << prevBulb;
 		cv::Point2d retPoint;
+		cv::Rect frame_bound(cv::Point(0, 0), m_imgRawFrame.size());
+		
+
 
 		cv::Point2d predictedPosition = predictAverage();
+		auto avgDim = [&](int n)
+		{
+			if (n > m_vecBulbs.size()) n = m_vecBulbs.size();
+			double sum = std::sqrt(
+				std::pow(m_vecBulbs.back().m_position.x - predictedPosition.x, 2) +
+				std::pow(m_vecBulbs.back().m_position.y - predictedPosition.y, 2));
+			auto it = m_vecBulbs.end();
+
+			for (int i = 0; i < n - 1; i++)
+			{
+				sum += (std::sqrt(
+					std::pow((*it).m_position.x - (*(it - 1)).m_position.x, 2) +
+					std::pow((*it).m_position.y - (*(it - 1)).m_position.y, 2)));
+				it--;
+			}
+			return sum / (double)n / 2.0;
+		};
+
+		double dim = avgDim(4);
+		cv::Rect predict_bound(predictedPosition.x - dim / 2, predictedPosition.y - dim / 2, dim, dim);
+		bool containsPredictedPoint = frame_bound.contains(predictedPosition);
+
+		if (!containsPredictedPoint)
+		{
+			cv::Point2d center = (frame_bound.br() + frame_bound.tl()) * 0.5;
+			std::vector<double> minX{ predictedPosition.x, center.x + frame_bound.x };
+			std::vector<double> minY{ predictedPosition.y, center.y + frame_bound.y };
+			auto xit = std::min(minX.begin(), minX.end());
+			auto yit = std::min(minY.begin(), minY.end());
+			std::vector<double> maxX{ center.x - frame_bound.x, *xit };
+			std::vector<double> maxY{ center.y - frame_bound.y, *yit };
+			xit = std::max(maxX.begin(), maxX.end());
+			yit = std::max(maxY.begin(), maxY.end());
+			predictedPosition.x = *xit;
+			predictedPosition.y = *yit;
+		}
 		cv::drawMarker(m_imgCurrentFrame, predictedPosition, cv::Scalar(0, 0, 255), cv::MARKER_CROSS, 20, 3);
+		cv::rectangle(m_imgCurrentFrame, predict_bound, cv::Scalar(0, 230, 255),2);
+
 
 		
 
-		if (m_vecContours_detectBulb.size() == 0)
+		if (m_vecContours_detectBulb.size() == 0 && containsPredictedPoint) // zoom in image, try to find blob
 		{
-			retPoint = cv::Point(0, 0);
-			m_vecBulbs.emplace_back(bs::Bulb(predictedPosition, m_frameCounter, false));
+			retPoint = detectBulbInCloseRange(m_imgRawFrame, mask, predictedPosition);
+			m_vecBulbs.emplace_back(bs::Bulb(retPoint, m_frameCounter, false));
+		}
+		else if (m_vecContours_detectBulb.size() == 0 && !containsPredictedPoint)
+		{
+			retPoint = cv::Point(-1, -1);
 		}
 		else
 		{
 			//find blob by predicted point
-			double area1 = 0.0;
-			double area2 = 0.0;
+			double dist1 = 0.0;
+			double dist2 = 0.0;
 			int idx = 0;
 
-			area1 = cv::contourArea(m_vecContours_detectBulb[0]);
+			dist1 = distance(m_vecCentralMoments_detectBulb[0], predictedPosition);
 			retPoint = m_vecCentralMoments_detectBulb[0];
 
 			for (int i = 1; i < m_vecContours_detectBulb.size(); i++) {
-				area2 = cv::contourArea(m_vecContours_detectBulb[i]);
-				if (area2 > area1) {
+				dist2 = distance(m_vecCentralMoments_detectBulb[i], predictedPosition);
+				if (dist2 < dist1) {
 					retPoint = m_vecCentralMoments_detectBulb[i];
-					area1 = area2;
+					dist1 = dist2;
 					idx = i;
 				}
 			}
 
 			bool bulbOnMask = bulbVsMask(m_vecContours_detectBulb[idx], mask);
-			std::cout << "bulbVSmask: " << bulbOnMask << std::endl;
+			if (bulbOnMask)
+			{
+				m_vecBulbs.emplace_back(bs::Bulb(retPoint, m_frameCounter, false));
+			}
 			m_vecBulbs.emplace_back(bs::Bulb(retPoint, m_frameCounter));
 			m_vecBulbs.back().setMotion(&prevBulb);
 
 		}
 
 		return retPoint;
+	}
+
+	cv::Point2d LightTracker::detectBulbInCloseRange(const cv::Mat& frame, const cv::Mat& mask, const cv::Point2d marker)
+	{
+		cv::waitKey(WAIT_TIME);
+		auto avgDim = [&](int n)
+		{
+			if (n > m_vecBulbs.size()) n = m_vecBulbs.size();
+			double sum = std::sqrt(
+				std::pow(m_vecBulbs.back().m_position.x - marker.x, 2) +
+				std::pow(m_vecBulbs.back().m_position.y - marker.y, 2));
+			auto it = m_vecBulbs.end();
+			
+			for (int i = 0; i < n - 1; i++)
+			{
+				
+				sum += (std::sqrt(
+					std::pow((*it).m_position.x - (*(it - 1)).m_position.x, 2) +
+					std::pow((*it).m_position.y - (*(it - 1)).m_position.y, 2)));
+				it--;
+			}
+			return sum / (double)n / 2.0;
+		};
+		
+		double dim = avgDim(4);
+		cv::Rect bound(marker.x - dim / 2, marker.y - dim / 2, dim, dim);
+		cv::Mat frame_roi = frame(bound);
+		cv::Mat mask_roi = mask(bound);
+		cv::Mat frame_roi_thresh;
+		cv::Mat frame_roi_bulb;
+		cv::Mat frame_roi_canny;
+		thresholdLights(frame_roi, frame_roi_thresh);
+		cv::absdiff(frame_roi_thresh, mask_roi, frame_roi_bulb);
+		//cv::GaussianBlur(frame_roi_bulb, frame_roi_bulb, cv::Size(3, 3), 0);
+		cv::threshold(frame_roi_bulb, frame_roi_bulb, 200, 255, cv::THRESH_BINARY);
+		cv::dilate(frame_roi_bulb, frame_roi_bulb, m_kernelDilate_detectBulb);
+
+		std::vector<std::vector<cv::Point>> vecContours;
+		std::vector<cv::Vec4i>				vecHierarchy;
+		std::vector<cv::Moments>			vecMoments;
+		std::vector<cv::Point2f>			vecCentralMoments;
+
+		cv::Canny(
+			frame_roi_bulb,
+			frame_roi_canny, 50, 150, 3);
+		cv::findContours(
+			frame_roi_canny,
+			vecContours,
+			vecHierarchy,
+			cv::RETR_TREE,
+			cv::CHAIN_APPROX_SIMPLE,
+			cv::Point(0, 0));
+
+		vecMoments.reserve(vecContours.size());
+		vecCentralMoments.reserve(vecContours.size());
+
+		for (int i = 0; i < vecContours.size(); i++) {
+			vecMoments[i] =
+				cv::moments(vecContours[i], false); 		//moments for each blob / contour
+			vecCentralMoments[i] =
+				cv::Point2f(											//center of each blob / contour
+					vecMoments[i].m10 / vecMoments[i].m00,
+					vecMoments[i].m01 / vecMoments[i].m00);
+		}
+
+		double area1 = 0.0;
+		double area2 = 0.0;
+		cv::Point2d retPoint;
+
+		if (vecContours.size() > 1) {
+			area1 = cv::contourArea(vecContours[0]);
+			retPoint = vecCentralMoments[0];
+
+			for (int i = 1; i < vecContours.size(); i++) {
+				area2 = cv::contourArea(vecContours[i]);
+				if (area2 > area1) {
+					retPoint = vecCentralMoments[i];
+					area1 = area2;
+				}
+			}
+		}
+
+		cv::imshow("roi", frame_roi_bulb);
+		cv::waitKey(WAIT_TIME);
+		return retPoint;
+
+		
 	}
 
 	cv::Point2d LightTracker::detectBulbInFirstFrame(const cv::Mat& frame, const cv::Mat& mask)
@@ -275,6 +411,11 @@ namespace bs
 		return false;
 	}
 
+	double LightTracker::distance(const cv::Point2d& p1, const cv::Point2d& p2) const
+	{
+		return std::sqrt(std::pow(p1.x - p2.x, 2) + std::pow(p1.y - p2.y,2));
+	}
+
 	cv::Point2d LightTracker::predictAverage()
 	{
 		cv::Point2d predictedPosition;
@@ -324,7 +465,10 @@ namespace bs
 			predictedPosition.x = m_vecBulbs.back().m_position.x + deltaX;
 			predictedPosition.y = m_vecBulbs.back().m_position.y + deltaY;
 		}
-		return cv::Point2d(predictedPosition);
+
+		return predictedPosition;
+
+
 	}
 
 

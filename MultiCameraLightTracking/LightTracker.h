@@ -39,6 +39,7 @@ namespace bs
 
 
 		//frames
+		cv::Mat m_imgRawFrame;
 		cv::Mat m_imgFirstBulbFrame;
 		cv::Mat m_imgPreviousFrame;
 		cv::Mat m_imgCurrentFrame;
@@ -82,9 +83,11 @@ namespace bs
 		void createLightMask(const cv::Mat& frame1, const cv::Mat& frame2, cv::Mat& mask);
 
 		cv::Point2d detectBulb(const cv::Mat& frame, const cv::Mat& mask);
+		cv::Point2d detectBulbInCloseRange(const cv::Mat& frame,const cv::Mat& mask, const cv::Point2d marker);
 		cv::Point2d detectBulbInFirstFrame(const cv::Mat& frame, const cv::Mat& mask);
 
 		bool bulbVsMask(const std::vector<cv::Point>& bulbContour, const cv::Mat& mask);
+		double distance(const cv::Point2d& p1, const cv::Point2d& p2) const;
 
 		cv::Point2d predictAverage();
 		void imshow(

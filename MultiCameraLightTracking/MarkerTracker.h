@@ -10,7 +10,7 @@
 
 namespace bs
 {
-	struct Bulb
+	struct Marker
 	{
 		cv::Point2d m_position;
 		int32_t m_frameNumber;
@@ -19,18 +19,27 @@ namespace bs
 		cv::Vec2d m_direction;
 		double m_velocity;
 
+		Marker() {}
+		Marker(cv::Point2d& pos, int32_t frameNumber, bool visible = true);
+		void setMotion(const bs::Marker* prevMarker);
 
-		Bulb(cv::Point2d& pos, int32_t frameNumber, bool visible = true);
-		void setMotion(const bs::Bulb* b);
-
-		friend std::ostream & operator << ( std::ostream &out,const Bulb &b);
+		friend std::ostream & operator << ( std::ostream &out,const Marker &b);
 	
 	};
 
-	class LightTracker
+	enum MARKER_STATE
+	{
+		BULB_VISIBLE,
+		BULB_NOT_VISIBLE,
+		BULB_TOO_FAR,
+		BULB_OUT_OF_FRAME,
+		BULB_OVERLAPS_MASK,
+	};
+
+	class MarkerTracker
 	{
 	private:
-		std::vector<bs::Bulb> m_vecBulbs;
+		std::vector<bs::Marker> m_vecMarker;
 		
 		//window names
 		std::string m_sPreviousFrame	{ "previous frame" };
@@ -68,34 +77,38 @@ namespace bs
 		cv::Mat kernelErode;
 		int32_t notDetectCount{ 0 };
 
-		cv::Mat								imgCanny;
-		std::vector<std::vector<cv::Point>> vecContour;
-		std::vector<cv::Vec4i>				vecHierarchy;
-		std::vector<cv::Moments>			vecMoments;
-		std::vector<cv::Point2d>			vecMarker;
+		cv::Mat								m_imgCanny;
+		std::vector<cv::Vec4i>				m_vecContourHierarchy;
+		std::vector<cv::Moments>			m_vecMoments;
 		
 
 	public:
 
-		LightTracker(bs::VideoCaptureYUV* video);
+		MarkerTracker(bs::VideoCaptureYUV* video);
 		int32_t start();
-		~LightTracker();
+		~MarkerTracker();
 
 	protected:
-		void thresholdLights(const cv::Mat& frame, cv::Mat& imgThresh);
-		void createLightMask(const cv::Mat& frame1, const cv::Mat& frame2, cv::Mat& mask);
+		void threshold_lights(const cv::Mat& frame, cv::Mat& imgThresh);
+		void create_light_mask(const cv::Mat& frame1, const cv::Mat& frame2, cv::Mat& mask);
 
-		MARKER_STATE find_marker();
-		cv::Point2d select_marker(const cv::Point2d &predictedMarker, const cv::Rect &predictedRegion);
-		cv::Point2d find_marker_in_close_range(const cv::Mat& frame,const cv::Mat& mask, const cv::Point2d marker);
-		cv::Point2d find_marker_in_first_frame(const cv::Mat& frame, const cv::Mat& mask);
-
-
+		MARKER_STATE process_frame(
+			const cv::Mat& frame, 
+			const cv::Mat& mask,
+			std::vector<std::vector<cv::Point>> &vecCurrentContour,
+			std::vector<cv::Point2d> &vecCurrentCentralMoments);
+		cv::Rect2d create_region(const cv::Point2d& predictedMarker);
+		cv::Point2d select_marker(
+			const std::vector<cv::Point2d>& vecCurrentCenterMoments, 
+			const std::vector<std::vector<cv::Point>>& vecCurrentContours,
+			const cv::Point2d &predictedMarker, 
+			const cv::Rect2d &predictedRegion,
+			const cv::Mat& currentMaskRegion);
 
 		bool bulbVsMask(const std::vector<cv::Point>& bulbContour, const cv::Mat& mask);
 		double distance(const cv::Point2d& p1, const cv::Point2d& p2) const;
 
-		cv::Point2d predictAverage();
+		cv::Point2d predict_average();
 		void imshow(
 			bool previousFrame,
 			bool currentFrame, 
@@ -115,13 +128,6 @@ namespace bs
 
 	};
 
-	enum MARKER_STATE
-	{
-		BULB_VISIBLE,
-		BULB_NOT_VISIBLE,
-		BULB_TOO_FAR,
-		BULB_OUT_OF_FRAME,
-		BULB_OVERLAPS_MASK,
-	};
+	
 
 }

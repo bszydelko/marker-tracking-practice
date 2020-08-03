@@ -146,12 +146,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="LightTracker.cpp" />
+    <ClCompile Include="MarkerTracker.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="VideoCaptureYUV.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="LightTracker.h" />
+    <ClInclude Include="MarkerTracker.h" />
     <ClInclude Include="VideoCaptureYUV.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

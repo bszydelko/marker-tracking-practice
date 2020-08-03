@@ -1,6 +1,6 @@
 #include "opencv2/opencv.hpp"
 #include "VideoCaptureYUV.h"
-#include "LightTracker.h"
+#include "MarkerTracker.h"
 #include <string>
 
 
@@ -11,8 +11,8 @@ int main(int argc, char** argv) //TODO - provide support for handling main param
 
 	std::string sCamNum = "0";
 	std::string sFilename = "cam" + sCamNum + "_1920x1080.yuvdist.yuv";
-	//std::string sPath = "E:\\_SEQ\\" + sCamNum +"\\";
-	std::string sPath = "";
+	std::string sPath = "E:\\_SEQ\\" + sCamNum +"\\";
+	//std::string sPath = "";
 
 	int32_t width = 1920;
 	int32_t height = 1080;
@@ -31,7 +31,7 @@ int main(int argc, char** argv) //TODO - provide support for handling main param
 	bs::VideoCaptureYUV video(sPath + sFilename, width, height, chromaSubsampling);
 	if (!video.isOpened()) return 0;
 
-	bs::LightTracker tracker(&video);
+	bs::MarkerTracker tracker(&video);
 	
 	tracker.start();
 

@@ -1,58 +1,50 @@
 #include "LightTracker.h"
-#define WAIT_TIME 0
+
 namespace bs
 {
 	LightTracker::LightTracker(bs::VideoCaptureYUV* video)
-		: m_video(video)
+		: video(video)
 	{
 		//initialize windows
 		cv::namedWindow(m_sPreviousFrame, cv::WINDOW_KEEPRATIO);
-		cv::resizeWindow(m_sPreviousFrame, m_video->getResolution() / 2);
+		cv::resizeWindow(m_sPreviousFrame, video->getResolution() / 2);
 
 		cv::namedWindow(m_sCurrentFrame, cv::WINDOW_KEEPRATIO);
-		cv::resizeWindow(m_sCurrentFrame, m_video->getResolution() / 2);
+		cv::resizeWindow(m_sCurrentFrame, video->getResolution() / 2);
 
 		cv::namedWindow(m_sLightThresh1, cv::WINDOW_KEEPRATIO);
-		cv::resizeWindow(m_sLightThresh1, m_video->getResolution() / 3);
+		cv::resizeWindow(m_sLightThresh1, video->getResolution() / 3);
 		cv::namedWindow(m_sLightThresh2, cv::WINDOW_KEEPRATIO);
-		cv::resizeWindow(m_sLightThresh2, m_video->getResolution() / 3);
+		cv::resizeWindow(m_sLightThresh2, video->getResolution() / 3);
 
 		cv::namedWindow(m_sLightMask, cv::WINDOW_KEEPRATIO);
-		cv::resizeWindow(m_sLightMask, m_video->getResolution() / 3);
+		cv::resizeWindow(m_sLightMask, video->getResolution() / 3);
 
 		cv::namedWindow(m_sBulb, cv::WINDOW_KEEPRATIO);
-		cv::resizeWindow(m_sBulb, m_video->getResolution() / 2);
+		cv::resizeWindow(m_sBulb, video->getResolution() / 2);
 
 		cv::namedWindow(m_sContoursMoments, cv::WINDOW_KEEPRATIO);
-		cv::resizeWindow(m_sContoursMoments, m_video->getResolution());
+		cv::resizeWindow(m_sContoursMoments, video->getResolution());
 
 		m_kernelDilate_thresholdLights = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5));
-		m_kernelDilate_detectBulb = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11, 11));
+		kernelDilate = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11, 11));
 
 	}
 
 	int32_t LightTracker::start()
 	{
+
+
 		//thresh1
-		m_video->read(m_imgCurrentFrame);
-		m_frameCounter++;
-		thresholdLights(m_imgCurrentFrame, m_imgLightThresh1);
+		video->read(imgCurrentFrame);
+		thresholdLights(imgCurrentFrame, imgLightThresh1);
 
 		//thresh2
-		m_video->read(m_imgCurrentFrame);
-		m_frameCounter++;
-		thresholdLights(m_imgCurrentFrame, m_imgLightThresh2);
+		video->read(imgCurrentFrame);
+		thresholdLights(imgCurrentFrame, imgLightThresh2);
 
-		createLightMask(m_imgLightThresh1, m_imgLightThresh2, m_imgLightMask);
+		createLightMask(imgLightThresh1, imgLightThresh2, imgLightMask);
 
-		m_video->read(m_imgFirstBulbFrame);
-		m_frameCounter++;
-		cv::Point2d bulbFirstPos = detectBulbInFirstFrame(m_imgFirstBulbFrame, m_imgLightMask);
-		m_vecBulbs.emplace_back(bs::Bulb(bulbFirstPos, m_frameCounter));
-
-		//cv::circle(m_imgFirstBulbFrame, bulbFirstPos, 10, cv::Scalar(234, 247, 29), 3);
-		//cv::imshow("first bulb pos", m_imgFirstBulbFrame);
-		m_imgFirstBulbFrame.copyTo(m_imgPreviousFrame);
 	
 		//imshow triggers
 		bool previousFrame = 0;
@@ -63,22 +55,46 @@ namespace bs
 		bool bulb = 1;
 		bool contoursMoments = 1;
 
-		while (m_video->read(m_imgCurrentFrame))
+		cv::Point2d marker;
+		cv::Point2d predictedMarker;
+		cv::Rect predictedRegion;
+		std::vector<cv::Point2d> vecCurrentMarker;
+		std::vector < std::vector<cv::Point>> vecCurrentContour;
+		MARKER_STATE state;
+
+		while (video->read(imgCurrentFrame))
 		{
-			m_imgCurrentFrame.copyTo(m_imgRawFrame);
-			m_frameCounter++;
-
 			if (cv::waitKey(5) == 27) break;
-			
 
-			m_bulbPos = detectBulb(m_imgCurrentFrame, m_imgLightMask);
-			cv::circle(m_imgCurrentFrame, m_bulbPos, 10, cv::Scalar(0, 255, 0), 3);
+			imgCurrentFrame.copyTo(imgRawFrame);
 
+
+			//new stuff
+
+			state = find_marker();
+			predictedMarker = predictAverage();
+
+			switch (state)
+			{
+			case BULB_VISIBLE:
+				
+				marker = select_marker(vecCurrentMarker, predictedMarker, predictedRegion);
+
+				break;
+
+			case BULB_NOT_VISIBLE:
+
+
+				break;
+			}
+
+
+			//new stuff
 			
 			imshow(previousFrame, currentFrame, lightThresh1, lightThresh2, lightMask, bulb, contoursMoments);
-			std::cout << m_frameCounter << m_bulbPos << std::endl;
+			std::cout << video->getFrameID() << m_bulbPos << std::endl;
 
-			m_imgCurrentFrame.copyTo(m_imgPreviousFrame);
+			imgCurrentFrame.copyTo(imgPreviousFrame);
 			cv::waitKey(WAIT_TIME);
 
 		}
@@ -106,27 +122,28 @@ namespace bs
 		cv::bitwise_and(frame1, frame2, mask);
 	}
 
-	cv::Point2d LightTracker::detectBulb(const cv::Mat& frame, const cv::Mat& mask)
+
+	MARKER_STATE LightTracker::find_marker()
 	{
-		thresholdLights	(frame, m_imgThresh_detectBulb);
-		cv::absdiff		(m_imgThresh_detectBulb, mask, m_imgBulb_detectBulb);
-		cv::GaussianBlur(m_imgBulb_detectBulb, m_imgBulb_detectBulb, cv::Size(3, 3), 0);
-		cv::threshold	(m_imgBulb_detectBulb, m_imgBulb_detectBulb, 220, 255, cv::THRESH_BINARY);
-		cv::dilate		(m_imgBulb_detectBulb, m_imgBulb_detectBulb, m_kernelDilate_detectBulb);
+		thresholdLights	(imgRawFrame, imgThresh);
+		cv::absdiff		(imgThresh, imgLightMask, imgBulb);
+		cv::GaussianBlur(imgBulb, imgBulb, cv::Size(3, 3), 0);
+		cv::threshold	(imgBulb, imgBulb, 220, 255, cv::THRESH_BINARY);
+		cv::dilate		(imgBulb, imgBulb, kernelDilate);
 
 		//check if another object cover mask
 		cv::Mat kernel_e = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(9, 9));
 		cv::Mat kernel_d = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
 
 		cv::Mat bulb;
-		m_imgBulb_detectBulb.copyTo(bulb);
+		imgBulb.copyTo(bulb);
 		cv::erode(bulb, bulb, kernel_e);
 		bool retVal = false;
-		for (size_t r = 0; r < frame.rows; r++)
+		for (size_t r = 0; r < imgRawFrame.rows; r++)
 		{
-			for (size_t c = 0; c < frame.cols; c++)
+			for (size_t c = 0; c < imgRawFrame.cols; c++)
 			{
-				if (mask.at<uint8_t>(r, c) && m_imgBulb_detectBulb.at<uint8_t>(r, c))
+				if (imgLightMask.at<uint8_t>(r, c) && imgBulb.at<uint8_t>(r, c))
 				{
 					retVal = true;
 					bulb.at<uint8_t>(r, c) = 0;
@@ -135,128 +152,100 @@ namespace bs
 		}
 
 		cv::dilate(bulb, bulb, kernel_d);
-		bulb.copyTo(m_imgBulb_detectBulb);
+		bulb.copyTo(imgBulb);
 		//check if another object cover mask
 
 		//contours
 		cv::Canny(
-			m_imgBulb_detectBulb, 
-			m_imgCanny_detectBulb, 50, 150, 3);
+			imgBulb, 
+			imgCanny, 50, 150, 3);
 		cv::findContours(
-			m_imgCanny_detectBulb, 
-			m_vecContours_detectBulb, 
-			m_vecHierarchy_detectBulb, 
+			imgCanny, 
+			vecContour, 
+			vecHierarchy, 
 			cv::RETR_EXTERNAL, 
 			cv::CHAIN_APPROX_NONE, 
 			cv::Point(0, 0));
 
-		m_vecMoments_detectBulb.clear();
-		m_vecMoments_detectBulb.reserve(m_vecContours_detectBulb.size());
-		m_vecCentralMoments_detectBulb.clear();
-		m_vecCentralMoments_detectBulb.reserve(m_vecContours_detectBulb.size());
+		vecMoments.clear();
+		vecMoments.reserve(vecContour.size());
+		vecMarker.clear();
+		vecMarker.reserve(vecContour.size());
 		//contours
 
-		for (int i = 0; i < m_vecContours_detectBulb.size(); i++)
+		for (int i = 0; i < vecContour.size(); i++)
 		{
-			m_vecMoments_detectBulb[i] = 
-				cv::moments(m_vecContours_detectBulb[i], false); 		//moments for each blob / contour
-			m_vecCentralMoments_detectBulb[i] = 
+			vecMoments[i] = 
+				cv::moments(vecContour[i], false); 		//moments for each blob / contour
+			vecMarker[i] = 
 				cv::Point2d(											//center of each blob / contour
-					m_vecMoments_detectBulb[i].m10 / m_vecMoments_detectBulb[i].m00, 
-					m_vecMoments_detectBulb[i].m01 / m_vecMoments_detectBulb[i].m00); 		
+					vecMoments[i].m10 / vecMoments[i].m00, 
+					vecMoments[i].m01 / vecMoments[i].m00); 		
 		}
 
-		bs::Bulb prevBulb = m_vecBulbs.back();
-		cv::Point2d retPoint;
-		cv::Rect frame_bound(cv::Point(0, 0), m_imgRawFrame.size());
-		
+		if (vecContour.size() == 0) return BULB_NOT_VISIBLE;
+		else return BULB_VISIBLE;
+	}
 
-
-		cv::Point2d predictedPosition = predictAverage();
-		auto avgDim = [&](int n)
+	cv::Point2d LightTracker::select_marker(const cv::Point2d& predictedMarker, const cv::Rect& predictedRegion)
+	{
+		//precondition: vecMarker.size() >= 1
+		auto distance = [](const cv::Point2d& pt1, const cv::Point2d& pt2)
 		{
-			if (n > m_vecBulbs.size()) n = m_vecBulbs.size();
-			double sum = std::sqrt(
-				std::pow(m_vecBulbs.back().m_position.x - predictedPosition.x, 2) +
-				std::pow(m_vecBulbs.back().m_position.y - predictedPosition.y, 2));
-			auto it = m_vecBulbs.end();
-
-			for (int i = 0; i < n - 1; i++)
-			{
-				sum += (std::sqrt(
-					std::pow((*it).m_position.x - (*(it - 1)).m_position.x, 2) +
-					std::pow((*it).m_position.y - (*(it - 1)).m_position.y, 2)));
-				it--;
-			}
-			return sum / (double)n / 2.0;
+			cv::Point diff = pt1 - pt2;
+			return cv::sqrt(diff.x * diff.x + diff.y * diff.y);
 		};
-
-		double dim = avgDim(4);
-		cv::Rect predict_bound(predictedPosition.x - dim / 2, predictedPosition.y - dim / 2, dim, dim);
-		bool containsPredictedPoint = frame_bound.contains(predictedPosition);
-
-		if (!containsPredictedPoint)
-		{
-			cv::Point2d center = (frame_bound.br() + frame_bound.tl()) * 0.5;
-			std::vector<double> minX{ predictedPosition.x, center.x + frame_bound.x };
-			std::vector<double> minY{ predictedPosition.y, center.y + frame_bound.y };
-			auto xit = std::min(minX.begin(), minX.end());
-			auto yit = std::min(minY.begin(), minY.end());
-			std::vector<double> maxX{ center.x - frame_bound.x, *xit };
-			std::vector<double> maxY{ center.y - frame_bound.y, *yit };
-			xit = std::max(maxX.begin(), maxX.end());
-			yit = std::max(maxY.begin(), maxY.end());
-			predictedPosition.x = *xit;
-			predictedPosition.y = *yit;
-		}
-		cv::drawMarker(m_imgCurrentFrame, predictedPosition, cv::Scalar(0, 0, 255), cv::MARKER_CROSS, 20, 3);
-		cv::rectangle(m_imgCurrentFrame, predict_bound, cv::Scalar(0, 230, 255),2);
-
-
 		
+		std::vector<cv::Point2d> vecMarkerInRegion;
+		cv::Point2d retPoint(-1,-1);
 
-		if (m_vecContours_detectBulb.size() == 0 && containsPredictedPoint) // zoom in image, try to find blob
+		if (vecMarker.size() > 1)
 		{
-			retPoint = detectBulbInCloseRange(m_imgRawFrame, mask, predictedPosition);
-			m_vecBulbs.emplace_back(bs::Bulb(retPoint, m_frameCounter, false));
-		}
-		else if (m_vecContours_detectBulb.size() == 0 && !containsPredictedPoint)
-		{
-			retPoint = cv::Point(-1, -1);
+			for (int i = 0; i < vecMarker.size(); i++) //checks collision for each marker in region
+			{
+				if (predictedRegion.contains(vecMarker[i]))
+					if (!bulbVsMask(vecContour[i], imgLightMask))
+						vecMarkerInRegion.push_back(vecMarker[i]);
+			}
+
+			double dist2 = 0.0;
+			double dist1 = distance(vecMarkerInRegion[0], predictedMarker);
+			int closer = 0;
+
+			for (int i = 1; i < vecMarkerInRegion.size(); i++)
+			{
+				dist2 = distance(vecMarkerInRegion[i], predictedMarker);
+				if (dist2 < dist1)
+				{
+					dist2 = dist1;
+					closer = i;
+				}
+
+			}
+
+			retPoint = vecMarkerInRegion[closer];
+
 		}
 		else
 		{
-			//find blob by predicted point
-			double dist1 = 0.0;
-			double dist2 = 0.0;
-			int idx = 0;
-
-			dist1 = distance(m_vecCentralMoments_detectBulb[0], predictedPosition);
-			retPoint = m_vecCentralMoments_detectBulb[0];
-
-			for (int i = 1; i < m_vecContours_detectBulb.size(); i++) {
-				dist2 = distance(m_vecCentralMoments_detectBulb[i], predictedPosition);
-				if (dist2 < dist1) {
-					retPoint = m_vecCentralMoments_detectBulb[i];
-					dist1 = dist2;
-					idx = i;
-				}
-			}
-
-			bool bulbOnMask = bulbVsMask(m_vecContours_detectBulb[idx], mask);
-			if (bulbOnMask)
+			if (predictedRegion.contains(vecMarker[0]))
 			{
-				m_vecBulbs.emplace_back(bs::Bulb(retPoint, m_frameCounter, false));
+				if (!bulbVsMask(vecContour[0], imgLightMask))
+					retPoint = vecMarker[0];
 			}
-			m_vecBulbs.emplace_back(bs::Bulb(retPoint, m_frameCounter));
-			m_vecBulbs.back().setMotion(&prevBulb);
+			else
+			{
+				double dist = distance(vecMarker[0], predictedMarker);
+			}
+
 
 		}
+
 
 		return retPoint;
 	}
 
-	cv::Point2d LightTracker::detectBulbInCloseRange(const cv::Mat& frame, const cv::Mat& mask, const cv::Point2d marker)
+	cv::Point2d LightTracker::find_marker_in_close_range(const cv::Mat& frame, const cv::Mat& mask, const cv::Point2d marker)
 	{
 		cv::waitKey(WAIT_TIME);
 		auto avgDim = [&](int n)
@@ -289,7 +278,7 @@ namespace bs
 		cv::absdiff(frame_roi_thresh, mask_roi, frame_roi_bulb);
 		//cv::GaussianBlur(frame_roi_bulb, frame_roi_bulb, cv::Size(3, 3), 0);
 		cv::threshold(frame_roi_bulb, frame_roi_bulb, 200, 255, cv::THRESH_BINARY);
-		cv::dilate(frame_roi_bulb, frame_roi_bulb, m_kernelDilate_detectBulb);
+		cv::dilate(frame_roi_bulb, frame_roi_bulb, kernelDilate);
 
 		std::vector<std::vector<cv::Point>> vecContours;
 		std::vector<cv::Vec4i>				vecHierarchy;
@@ -343,7 +332,7 @@ namespace bs
 		
 	}
 
-	cv::Point2d LightTracker::detectBulbInFirstFrame(const cv::Mat& frame, const cv::Mat& mask)
+	cv::Point2d LightTracker::find_marker_in_first_frame(const cv::Mat& frame, const cv::Mat& mask)
 	{
 		cv::Mat								frame_thresh;
 		cv::Mat								frame_bulb;
@@ -357,7 +346,7 @@ namespace bs
 		cv::absdiff		(frame_thresh, mask, frame_bulb);
 		cv::GaussianBlur(frame_bulb, frame_bulb, cv::Size(3, 3), 0);
 		cv::threshold	(frame_bulb, frame_bulb, 220, 255, cv::THRESH_BINARY);
-		cv::dilate		(frame_bulb, frame_bulb, m_kernelDilate_detectBulb);
+		cv::dilate		(frame_bulb, frame_bulb, kernelDilate);
 
 		cv::Canny(
 			frame_bulb,
@@ -481,29 +470,29 @@ namespace bs
 		bool bulb, 
 		bool contoursMoments)
 	{
-		if (previousFrame)	cv::imshow(m_sPreviousFrame, m_imgPreviousFrame);
+		if (previousFrame)	cv::imshow(m_sPreviousFrame, imgPreviousFrame);
 		else				cv::destroyWindow(m_sPreviousFrame);
-		if (currentFrame)	cv::imshow(m_sCurrentFrame, m_imgCurrentFrame);
+		if (currentFrame)	cv::imshow(m_sCurrentFrame, imgCurrentFrame);
 		else				cv::destroyWindow(m_sCurrentFrame);
-		if (lightThresh1)	cv::imshow(m_sLightThresh1, m_imgLightThresh1);
+		if (lightThresh1)	cv::imshow(m_sLightThresh1, imgLightThresh1);
 		else				cv::destroyWindow(m_sLightThresh1);
-		if (lightThresh2)	cv::imshow(m_sLightThresh2, m_imgLightThresh2);
+		if (lightThresh2)	cv::imshow(m_sLightThresh2, imgLightThresh2);
 		else				cv::destroyWindow(m_sLightThresh2);
-		if (lightMask) 		cv::imshow(m_sLightMask, m_imgLightMask);
+		if (lightMask) 		cv::imshow(m_sLightMask, imgLightMask);
 		else				cv::destroyWindow(m_sLightMask);
-		if (bulb)			cv::imshow(m_sBulb, m_imgBulb_detectBulb);
+		if (bulb)			cv::imshow(m_sBulb, imgBulb);
 		else				cv::destroyWindow(m_sBulb);
 		if (contoursMoments)
 		{
-			m_imgContoursMoments = cv::Mat(m_imgCanny_detectBulb.size(), CV_8UC3, cv::Scalar(255, 255, 255));
+			imgContoursMoments = cv::Mat(imgCanny.size(), CV_8UC3, cv::Scalar(255, 255, 255));
 			cv::Scalar color = cv::Scalar(167, 151, 0);
 
-			for (int i = 0; i < m_vecContours_detectBulb.size(); i++)
+			for (int i = 0; i < vecContour.size(); i++)
 			{
-				cv::drawContours(m_imgContoursMoments, m_vecContours_detectBulb, i, color, 2, 8, m_vecHierarchy_detectBulb, 0, cv::Point());
-				cv::circle(m_imgContoursMoments, m_vecCentralMoments_detectBulb[i], 4, -1, 0);
+				cv::drawContours(imgContoursMoments, vecContour, i, color, 2, 8, vecHierarchy, 0, cv::Point());
+				cv::circle(imgContoursMoments, vecMarker[i], 4, -1, 0);
 			}
-			cv::imshow(m_sContoursMoments, m_imgContoursMoments);
+			cv::imshow(m_sContoursMoments, imgContoursMoments);
 		}
 		else				cv::destroyWindow(m_sContoursMoments);
 	}

@@ -4,6 +4,10 @@
 #include "VideoCaptureYUV.h"
 #include <vector>
 
+#define WAIT_TIME 0
+#define FIRST_FRAME 2 
+
+
 namespace bs
 {
 	struct Bulb
@@ -39,17 +43,17 @@ namespace bs
 
 
 		//frames
-		cv::Mat m_imgRawFrame;
-		cv::Mat m_imgFirstBulbFrame;
-		cv::Mat m_imgPreviousFrame;
-		cv::Mat m_imgCurrentFrame;
-		cv::Mat m_imgLightThresh1;
-		cv::Mat m_imgLightThresh2;
-		cv::Mat m_imgLightMask;
-		cv::Mat m_imgContoursMoments;
+		cv::Mat imgRawFrame;
+		cv::Mat imgFirstBulbFrame;
+		cv::Mat imgPreviousFrame;
+		cv::Mat imgCurrentFrame;
+		cv::Mat imgLightThresh1;
+		cv::Mat imgLightThresh2;
+		cv::Mat imgLightMask;
+		cv::Mat imgContoursMoments;
 
-		bs::VideoCaptureYUV* m_video;
-		uint32_t m_frameCounter{ 0 };
+		bs::VideoCaptureYUV* video;
+		uint32_t frameCounter{ 0 };
 
 		cv::Point m_bulbPos;
 
@@ -58,19 +62,18 @@ namespace bs
 		int32_t m_thresh_thresholdLights{ 210 };
 
 		//fun detectLight
-		cv::Mat m_imgThresh_detectBulb;
-		cv::Mat m_imgBulb_detectBulb;
-		cv::Mat m_kernelDilate_detectBulb;
-		cv::Mat m_kernelErode_detectBulb;
-		int32_t m_notDetectCount{ 0 };
+		cv::Mat imgThresh;
+		cv::Mat imgBulb;
+		cv::Mat kernelDilate;
+		cv::Mat kernelErode;
+		int32_t notDetectCount{ 0 };
 
-		cv::Mat								m_imgCanny_detectBulb;
-		std::vector<std::vector<cv::Point>> m_vecContours_detectBulb;
-		std::vector<cv::Vec4i>				m_vecHierarchy_detectBulb;
-		std::vector<cv::Moments>			m_vecMoments_detectBulb;
-		std::vector<cv::Point2d>			m_vecCentralMoments_detectBulb;
+		cv::Mat								imgCanny;
+		std::vector<std::vector<cv::Point>> vecContour;
+		std::vector<cv::Vec4i>				vecHierarchy;
+		std::vector<cv::Moments>			vecMoments;
+		std::vector<cv::Point2d>			vecMarker;
 		
-
 
 	public:
 
@@ -82,9 +85,12 @@ namespace bs
 		void thresholdLights(const cv::Mat& frame, cv::Mat& imgThresh);
 		void createLightMask(const cv::Mat& frame1, const cv::Mat& frame2, cv::Mat& mask);
 
-		cv::Point2d detectBulb(const cv::Mat& frame, const cv::Mat& mask);
-		cv::Point2d detectBulbInCloseRange(const cv::Mat& frame,const cv::Mat& mask, const cv::Point2d marker);
-		cv::Point2d detectBulbInFirstFrame(const cv::Mat& frame, const cv::Mat& mask);
+		MARKER_STATE find_marker();
+		cv::Point2d select_marker(const cv::Point2d &predictedMarker, const cv::Rect &predictedRegion);
+		cv::Point2d find_marker_in_close_range(const cv::Mat& frame,const cv::Mat& mask, const cv::Point2d marker);
+		cv::Point2d find_marker_in_first_frame(const cv::Mat& frame, const cv::Mat& mask);
+
+
 
 		bool bulbVsMask(const std::vector<cv::Point>& bulbContour, const cv::Mat& mask);
 		double distance(const cv::Point2d& p1, const cv::Point2d& p2) const;
@@ -109,8 +115,9 @@ namespace bs
 
 	};
 
-	enum BULB_STATE
+	enum MARKER_STATE
 	{
+		BULB_VISIBLE,
 		BULB_NOT_VISIBLE,
 		BULB_TOO_FAR,
 		BULB_OUT_OF_FRAME,

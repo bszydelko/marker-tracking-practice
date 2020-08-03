@@ -32,9 +32,6 @@ namespace bs
 	VideoCaptureYUV::VideoCaptureYUV(const std::string& filename, int32_t width, int32_t height, int32_t chromaSubsampling)
 		: m_filename(filename), m_width(width), m_height(height), m_chromaSubsampling(chromaSubsampling)
 	{
-		m_error = false;
-		m_frame = nullptr;
-		m_numFrames = 0;
 
 		m_file.open(m_filename, std::ios::binary);
 
@@ -95,6 +92,7 @@ namespace bs
 		}
 
 		cv::cvtColor(dst, dst, cv::COLOR_YUV2BGR);
+		m_frameID++;
 
 		return true;
 	}
@@ -113,6 +111,11 @@ namespace bs
 		m_file.seekg(lastPos);
 
 		return retVal;
+	}
+
+	int32_t VideoCaptureYUV::getFrameID() const
+	{
+		return int32_t(m_frameID);
 	}
 
 	cv::Size VideoCaptureYUV::getResolution() const

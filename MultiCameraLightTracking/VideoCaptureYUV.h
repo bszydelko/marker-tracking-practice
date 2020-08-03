@@ -32,7 +32,7 @@ namespace bs
 	class VideoCaptureYUV
 	{
 	private:
-		bool m_error;
+		bool m_error{ false };
 		std::ifstream m_file;
 		std::string  m_filename;
 
@@ -40,8 +40,10 @@ namespace bs
 		int32_t m_height;
 		int32_t m_chromaSubsampling;
 
-		FrameYUV* m_frame;
-		int32_t m_numFrames;
+		FrameYUV* m_frame{ nullptr };
+		int32_t m_numFrames{ 0 };
+
+		int32_t m_frameID{ -1 };
 
 	public:
 
@@ -51,6 +53,7 @@ namespace bs
 		bool isOpened() { return !m_error; }
 		bool read(cv::Mat& dst);
 		bool read(cv::Mat& dst, int32_t frameNumber);
+		int32_t getFrameID() const;
 		cv::Size getResolution() const;
 	};
 

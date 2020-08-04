@@ -5,7 +5,7 @@
 #include <vector>
 
 #define WAIT_TIME 0
-#define FIRST_FRAME 2 
+#define FIRST_FRAME 2
 
 
 namespace bs
@@ -96,14 +96,18 @@ namespace bs
 			const cv::Mat& frame, 
 			const cv::Mat& mask,
 			std::vector<std::vector<cv::Point>> &vecCurrentContour,
-			std::vector<cv::Point2d> &vecCurrentCentralMoments);
-		cv::Rect2d create_region(const cv::Point2d& predictedMarker);
+			std::vector<cv::Point2d> &vecCurrentCentralMoments,
+			int32_t thresh = 210,
+			bool bBlur = true);
+		cv::Rect2d create_region(const cv::Point2d& predictedMarker, const int32_t expand = 1);
 		cv::Point2d select_marker(
 			const std::vector<cv::Point2d>& vecCurrentCenterMoments, 
 			const std::vector<std::vector<cv::Point>>& vecCurrentContours,
 			const cv::Point2d &predictedMarker, 
 			const cv::Rect2d &predictedRegion,
 			const cv::Mat& currentMaskRegion);
+
+		bool region_contains_contour(const cv::Rect2d& region, const std::vector<cv::Point>& contour);
 
 		bool bulbVsMask(const std::vector<cv::Point>& bulbContour, const cv::Mat& mask);
 		double distance(const cv::Point2d& p1, const cv::Point2d& p2) const;

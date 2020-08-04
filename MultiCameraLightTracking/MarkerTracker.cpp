@@ -57,9 +57,11 @@ namespace bs
 		cv::Point2d marker;
 		cv::Point2d predictedMarker;
 		cv::Rect2d predictedRegion = cv::Rect2d(cv::Point2d(0,0), imgCurrentFrame.size());
+		cv::Rect frameBound = cv::Rect(cv::Point(0, 0), imgCurrentFrame.size());
 		std::vector<cv::Point2d> vecCurrentCentralMoments;
 		std::vector < std::vector<cv::Point>> vecCurrentContours;
-		bs::MARKER_STATE state;
+		bs::MARKER_STATE whole_frame_state;
+		bs::MARKER_STATE region_frame_state;
 		Marker prevMarker;
 
 		cv::waitKey(WAIT_TIME);
@@ -67,38 +69,84 @@ namespace bs
 
 		while (video->read(imgCurrentFrame))
 		{
-			if (cv::waitKey(5) == 27) break;
+			if (cv::waitKey(5) == 27) break; 
 
 			imgCurrentFrame.copyTo(imgRawFrame);
-			cv::imshow("raw", imgRawFrame);
-			cv::waitKey(WAIT_TIME);
-
-
 			//new stuff
 
-			predictedMarker = predict_average();
-			predictedRegion = create_region(predictedMarker);
-
-			currentMaskRegion = imgLightMask(predictedRegion);
-			currentFrameRegion = imgRawFrame(predictedRegion);
 			
-			state = process_frame(
-				currentFrameRegion, 
-				currentMaskRegion, 
+			
+			whole_frame_state = process_frame(
+				imgCurrentFrame, 
+				imgLightMask, 
 				vecCurrentContours, 
 				vecCurrentCentralMoments);
 			
 
-			switch (state)
+			switch (whole_frame_state)
 			{
-			case BULB_VISIBLE:
+			case BULB_VISIBLE: //whole image
+				//process frame in range
+				predictedMarker = predict_average();
+				predictedRegion = create_region(predictedMarker);
 
-				marker = select_marker(
-					vecCurrentCentralMoments,
+				currentMaskRegion = imgLightMask(predictedRegion);
+				currentFrameRegion = imgRawFrame(predictedRegion);
+
+				region_frame_state = process_frame(
+					currentFrameRegion,
+					currentMaskRegion,
 					vecCurrentContours,
-					predictedMarker,
-					predictedRegion,
-					currentMaskRegion);
+					vecCurrentCentralMoments);
+
+				switch (region_frame_state) //region
+				{
+				case BULB_VISIBLE:
+					marker = select_marker(
+						vecCurrentCentralMoments,
+						vecCurrentContours,
+						predictedMarker,
+						predictedRegion,
+						currentMaskRegion);
+
+					break;
+				case BULB_NOT_VISIBLE: //find in larger region by expanding current region
+					int32_t expand = 3;
+					int32_t max_attempt = 4;
+					int32_t attempt = 0;
+					MARKER_STATE state = BULB_NOT_VISIBLE;
+
+					while (attempt < max_attempt && state == BULB_NOT_VISIBLE)
+					{
+
+						predictedRegion = create_region(predictedMarker, expand);
+						currentMaskRegion = imgLightMask(predictedRegion);
+						currentFrameRegion = imgRawFrame(predictedRegion);
+						state = process_frame(
+							currentFrameRegion,
+							currentMaskRegion,
+							vecCurrentContours,
+							vecCurrentCentralMoments);
+						expand += 1;
+						attempt++;
+					}
+					if (state == BULB_VISIBLE) {
+						marker = select_marker(
+							vecCurrentCentralMoments,
+							vecCurrentContours,
+							predictedMarker,
+							predictedRegion,
+							currentMaskRegion);
+					}
+					else
+					{
+						std::cout << "region expanded not successful" << std::endl;
+					}
+
+					break;
+				}
+
+				
 
 				if (m_vecMarker.size() > 0) prevMarker = m_vecMarker.back();
 				m_vecMarker.emplace_back(bs::Marker(marker, video->getFrameID()));
@@ -109,7 +157,8 @@ namespace bs
 
 			case BULB_NOT_VISIBLE:
 
-				std::cout << video->getFrameID() << "out of frame" << std::endl;
+				if(!frameBound.contains(predictedMarker))
+					std::cout << video->getFrameID() << "out of frame" << std::endl;
 				break;
 			}
 
@@ -153,6 +202,9 @@ namespace bs
 		cv::Mat maskBound = 255 * cv::Mat::ones(frame1.size(), CV_8UC1);
 		cv::rectangle(maskBound, bound, cv::Scalar(0), -1);
 		cv::bitwise_and(frame1, frame2, mask);
+
+		cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+		cv::erode(maskBound, maskBound, kernel);
 		cv::bitwise_or(maskBound, mask, mask);
 	}
 
@@ -161,16 +213,18 @@ namespace bs
 		const cv::Mat& frame, 
 		const cv::Mat& mask, 
 		std::vector<std::vector<cv::Point>> &vecCurrentContour,
-		std::vector<cv::Point2d> &vecCurrentCentralMoments)
+		std::vector<cv::Point2d> &vecCurrentCentralMoments,
+		int32_t thresh,
+		bool bBlur)
 	{
 		threshold_lights(frame, imgThresh);
 		cv::absdiff		(imgThresh, mask, imgBulb);
-		cv::GaussianBlur(imgBulb, imgBulb, cv::Size(3, 3), 0);
-		cv::threshold	(imgBulb, imgBulb, m_thresh_thresholdLights, 255, cv::THRESH_BINARY);
+		if(bBlur) cv::GaussianBlur(imgBulb, imgBulb, cv::Size(3, 3), 0);
+		cv::threshold	(imgBulb, imgBulb, thresh, 255, cv::THRESH_BINARY);
 		cv::dilate		(imgBulb, imgBulb, kernelDilate);
 
 		//check if another object cover mask
-		cv::Mat kernel_e = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(9, 9));
+		cv::Mat kernel_e = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11, 11));
 		cv::Mat kernel_d = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
 
 		cv::Mat bulb;
@@ -187,10 +241,14 @@ namespace bs
 		}
 
 		cv::dilate(bulb, bulb, kernel_d);
+		//  cv::GaussianBlur(bulb, bulb, cv::Size(3, 3), 0);
 		bulb.copyTo(imgBulb);
 		//check if another object cover mask
 
 		//contours
+
+		vecCurrentContour.clear();
+		vecCurrentCentralMoments.clear();
 		cv::Canny(
 			imgBulb, 
 			m_imgCanny, 50, 150, 3);
@@ -212,17 +270,18 @@ namespace bs
 		{
 			m_vecMoments.emplace_back(
 				cv::moments(vecCurrentContour[i], false)); 		//moments for each blob / contour
+			
 			vecCurrentCentralMoments.emplace_back( 
 				cv::Point2d(											//center of each blob / contour
-					m_vecMoments[i].m10 / m_vecMoments[i].m00, 
-					m_vecMoments[i].m01 / m_vecMoments[i].m00)); 		
+					m_vecMoments[i].m10 / cv::contourArea(vecCurrentContour[i]), 
+					m_vecMoments[i].m01 / cv::contourArea(vecCurrentContour[i])));
 		}
 
 		if (vecCurrentContour.size() == 0) return BULB_NOT_VISIBLE;
 		else return BULB_VISIBLE;
 	}
 
-	cv::Rect2d MarkerTracker::create_region(const cv::Point2d& predictedMarker)
+	cv::Rect2d MarkerTracker::create_region(const cv::Point2d& predictedMarker, const int32_t expand)
 	{
 		if (m_vecMarker.size() == 0)
 		{
@@ -247,7 +306,9 @@ namespace bs
 				sum += (std::sqrt(
 					std::pow((*it).m_position.x - (*(it+1)).m_position.x, 2) +
 					std::pow((*it).m_position.y - (*(it+1)).m_position.y, 2)));
-				sum *= 2.5;
+				sum *= 2.0;
+				//sum += (*it).m_velocity;
+				//sum += std::abs((*it).m_direction[0]) + std::abs((*it).m_direction[1]);
 				++it;
 			}
 			return sum / (double)n;
@@ -255,7 +316,7 @@ namespace bs
 
 		};
 
-		double dim = avgDim(4);
+		double dim = avgDim(4) * expand;
 		cv::Rect2d region(predictedMarker.x - dim / 2.0, predictedMarker.y - dim / 2.0, dim, dim);
 
 		if (region.width > imgCurrentFrame.size().width)
@@ -298,7 +359,7 @@ namespace bs
 		{
 			for (int i = 0; i < vecCurrentCentralMoments.size(); i++) //checks collision for each marker in region
 			{
-				if (predictedRegion.contains(vecCurrentCentralMoments[i]))
+				if(region_contains_contour(predictedRegion, vecCurrentContours[i])) //NOPE NOPE NOPE, it actually checks contour in region XDDDD fix it
 					if (!bulbVsMask(vecCurrentContours[i], currentMaskRegion))
 						vecMarkerInRegion.push_back(vecCurrentCentralMoments[i]);
 			}
@@ -333,6 +394,12 @@ namespace bs
 			}
 
 
+			//temporary fix
+			if (vecMarkerInRegion.size() == 0) {
+				return retPoint;
+			}
+
+
 			retPoint = cv::Point2d(
 				predictedRegion.tl().x + vecMarkerInRegion[bigger].x,
 				predictedRegion.tl().y + vecMarkerInRegion[bigger].y);
@@ -344,7 +411,7 @@ namespace bs
 			fixedCentralMoment.x += predictedRegion.tl().x;
 			fixedCentralMoment.y += predictedRegion.tl().y;
 
-			if (predictedRegion.contains(fixedCentralMoment))
+			if(region_contains_contour(predictedRegion, vecCurrentContours[0]))
 			{
 				if (!bulbVsMask(vecCurrentContours[0], currentMaskRegion))
 					retPoint = fixedCentralMoment;
@@ -359,6 +426,21 @@ namespace bs
 
 
 		return retPoint;
+	}
+
+	bool MarkerTracker::region_contains_contour(const cv::Rect2d& region, const std::vector<cv::Point>& contour)
+	{
+		bool retval = true;
+		for ( auto point : contour) {
+			point.x += region.x; //fix region offset 
+			point.y += region.y;
+			if (!region.contains(point))
+			{
+				retval = false;
+				break;
+			}
+		}
+		return retval;
 	}
 
 

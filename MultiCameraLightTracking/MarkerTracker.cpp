@@ -58,8 +58,10 @@ namespace bs
 		cv::Point2d predictedMarker;
 		cv::Rect2d predictedRegion = cv::Rect2d(cv::Point2d(0,0), imgCurrentFrame.size());
 		cv::Rect frameBound = cv::Rect(cv::Point(0, 0), imgCurrentFrame.size());
-		std::vector<cv::Point2d> vecCurrentCentralMoments;
-		std::vector < std::vector<cv::Point>> vecCurrentContours;
+		std::vector<cv::Point2d> vecRegionCentralMoments;
+		std::vector<cv::Point2d> vecFrameCentralMoments;
+		std::vector < std::vector<cv::Point>> vecRegionContours;
+		std::vector < std::vector<cv::Point>> vecFrameContours;
 		bs::MARKER_STATE whole_frame_state;
 		bs::MARKER_STATE region_frame_state;
 		Marker prevMarker;
@@ -79,8 +81,8 @@ namespace bs
 			whole_frame_state = process_frame(
 				imgCurrentFrame, 
 				imgLightMask, 
-				vecCurrentContours, 
-				vecCurrentCentralMoments);
+				vecFrameContours, 
+				vecFrameCentralMoments);
 			
 
 			switch (whole_frame_state)
@@ -96,44 +98,52 @@ namespace bs
 				region_frame_state = process_frame(
 					currentFrameRegion,
 					currentMaskRegion,
-					vecCurrentContours,
-					vecCurrentCentralMoments);
+					vecRegionContours,
+					vecRegionCentralMoments);
+				if (region_frame_state == BULB_VISIBLE && !region_contains_contour(predictedRegion, vecRegionContours, vecFrameContours))
+					region_frame_state = BULB_NOT_VISIBLE;
 
 				switch (region_frame_state) //region
 				{
 				case BULB_VISIBLE:
 					marker = select_marker(
-						vecCurrentCentralMoments,
-						vecCurrentContours,
+						vecRegionCentralMoments,
+						vecRegionContours,
 						predictedMarker,
 						predictedRegion,
 						currentMaskRegion);
 
 					break;
 				case BULB_NOT_VISIBLE: //find in larger region by expanding current region
-					int32_t expand = 3;
-					int32_t max_attempt = 4;
+					int32_t expand = 2;
+					int32_t max_attempt = 100;
 					int32_t attempt = 0;
 					MARKER_STATE state = BULB_NOT_VISIBLE;
 
 					while (attempt < max_attempt && state == BULB_NOT_VISIBLE)
 					{
-
 						predictedRegion = create_region(predictedMarker, expand);
+
 						currentMaskRegion = imgLightMask(predictedRegion);
 						currentFrameRegion = imgRawFrame(predictedRegion);
-						state = process_frame(
+
+						process_frame(
 							currentFrameRegion,
 							currentMaskRegion,
-							vecCurrentContours,
-							vecCurrentCentralMoments);
-						expand += 1;
+							vecRegionContours,
+							vecRegionCentralMoments);
+
+						expand += 2;
 						attempt++;
+
+						if (region_contains_contour(predictedRegion, vecRegionContours, vecFrameContours))
+							state = BULB_VISIBLE;
 					}
+
 					if (state == BULB_VISIBLE) {
 						marker = select_marker(
-							vecCurrentCentralMoments,
-							vecCurrentContours,
+							vecRegionCentralMoments,
+							vecRegionContours,
 							predictedMarker,
 							predictedRegion,
 							currentMaskRegion);
@@ -146,21 +156,68 @@ namespace bs
 					break;
 				}
 
-				
-
 				if (m_vecMarker.size() > 0) prevMarker = m_vecMarker.back();
 				m_vecMarker.emplace_back(bs::Marker(marker, video->getFrameID()));
 				if (m_vecMarker.size() > 1)m_vecMarker.back().setMotion(&prevMarker);
+
+				
 				
 				std::cout << video->getFrameID() << " " << marker << std::endl;
 				break;
 
-			case BULB_NOT_VISIBLE:
+			case BULB_NOT_VISIBLE: //lower thresh
 
-				if(!frameBound.contains(predictedMarker))
+				//three cases:
+				// hidden in  mask;
+				// out of frame
+				// thresh to big
+
+				if (!frameBound.contains(predictedMarker)) {
 					std::cout << video->getFrameID() << "out of frame" << std::endl;
+					break;
+				}
+
+				MARKER_STATE state = BULB_NOT_VISIBLE;
+				int32_t thresh = 205;
+				int32_t expand = 2;
+				int32_t attempt = 0;
+				int32_t max_attempt = 100;
+
+				while (attempt < max_attempt && state == BULB_NOT_VISIBLE)
+				{
+					predictedRegion = create_region(predictedMarker, expand);
+
+					currentMaskRegion = imgLightMask(predictedRegion);
+					currentFrameRegion = imgRawFrame(predictedRegion); 
+
+					state = process_frame(
+						currentFrameRegion,
+						currentMaskRegion,
+						vecRegionContours,
+						vecRegionCentralMoments,
+						thresh,
+						false);
+					thresh -= 5;
+					attempt++;
+					expand++;
+
+					//if (region_contains_contour(predictedRegion, vecRegionContours, vecFrameContours))
+						//state = BULB_VISIBLE;
+				}
+				if (state == BULB_VISIBLE) {
+					marker = select_marker(
+						vecRegionCentralMoments,
+						vecRegionContours,
+						predictedMarker,
+						predictedRegion,
+						currentMaskRegion);
+				}
+
+
 				break;
 			}
+
+			
 
 
 			//new stuff
@@ -260,6 +317,15 @@ namespace bs
 			cv::CHAIN_APPROX_NONE, 
 			cv::Point(0, 0));
 
+		auto comp_contours = [](const std::vector<cv::Point>& a, const std::vector<cv::Point>& b) -> bool
+		{
+			return cv::contourArea(a) < cv::contourArea(b); //last should be biggest
+		};
+
+		std::sort(vecCurrentContour.begin(), vecCurrentContour.end(), comp_contours);
+
+
+
 		m_vecMoments.clear();
 		m_vecMoments.reserve(vecCurrentContour.size());
 		vecCurrentCentralMoments.clear();
@@ -306,7 +372,7 @@ namespace bs
 				sum += (std::sqrt(
 					std::pow((*it).m_position.x - (*(it+1)).m_position.x, 2) +
 					std::pow((*it).m_position.y - (*(it+1)).m_position.y, 2)));
-				sum *= 2.0;
+				//sum *= 2.0;
 				//sum += (*it).m_velocity;
 				//sum += std::abs((*it).m_direction[0]) + std::abs((*it).m_direction[1]);
 				++it;
@@ -339,8 +405,8 @@ namespace bs
 	}
 
 	cv::Point2d MarkerTracker::select_marker(
-		const std::vector<cv::Point2d>& vecCurrentCentralMoments,
-		const std::vector<std::vector<cv::Point>>& vecCurrentContours, 
+		const std::vector<cv::Point2d>& vecRegionCentralMoments,
+		const std::vector<std::vector<cv::Point>>& vecRegionContours, 
 		const cv::Point2d& predictedMarker, 
 		const cv::Rect2d& predictedRegion,
 		const cv::Mat& currentMaskRegion)
@@ -355,13 +421,13 @@ namespace bs
 		std::vector<cv::Point2d> vecMarkerInRegion;
 		cv::Point2d retPoint(-1,-1);
 
-		if (vecCurrentCentralMoments.size() > 1)
+
+		if (vecRegionCentralMoments.size() > 1)
 		{
-			for (int i = 0; i < vecCurrentCentralMoments.size(); i++) //checks collision for each marker in region
+			for (int i = 0; i < vecRegionCentralMoments.size(); i++) //checks collision for each marker in region
 			{
-				if(region_contains_contour(predictedRegion, vecCurrentContours[i])) //NOPE NOPE NOPE, it actually checks contour in region XDDDD fix it
-					if (!bulbVsMask(vecCurrentContours[i], currentMaskRegion))
-						vecMarkerInRegion.push_back(vecCurrentCentralMoments[i]);
+					if (!bulbVsMask(vecRegionContours[i], currentMaskRegion))
+						vecMarkerInRegion.push_back(vecRegionCentralMoments[i]);
 			}
 
 			/*double dist2 = 0.0;
@@ -380,12 +446,12 @@ namespace bs
 			}*/
 
 			double area2 = 0.0;
-			double area1 = cv::contourArea(vecCurrentContours[0]);
+			double area1 = cv::contourArea(vecRegionContours[0]);
 			int bigger = 0;
 
 			for (int i = 1; i < vecMarkerInRegion.size(); i++)
 			{
-				area2 = cv::contourArea(vecCurrentContours[i]);
+				area2 = cv::contourArea(vecRegionContours[i]);
 				if (area2 > area1)
 				{
 					area1 = area2;
@@ -407,19 +473,15 @@ namespace bs
 		}
 		else
 		{
-			cv::Point2d fixedCentralMoment = vecCurrentCentralMoments[0];
+			cv::Point2d fixedCentralMoment = vecRegionCentralMoments[0];
 			fixedCentralMoment.x += predictedRegion.tl().x;
 			fixedCentralMoment.y += predictedRegion.tl().y;
 
-			if(region_contains_contour(predictedRegion, vecCurrentContours[0]))
-			{
-				if (!bulbVsMask(vecCurrentContours[0], currentMaskRegion))
-					retPoint = fixedCentralMoment;
-			}
+			if (!bulbVsMask(vecRegionContours[0], currentMaskRegion))
+				retPoint = fixedCentralMoment;
 			else
-			{
-				double dist = distance(vecCurrentCentralMoments[0], predictedMarker);
-			}
+				double dist = distance(vecRegionCentralMoments[0], predictedMarker);
+			
 
 
 		}
@@ -428,21 +490,21 @@ namespace bs
 		return retPoint;
 	}
 
-	bool MarkerTracker::region_contains_contour(const cv::Rect2d& region, const std::vector<cv::Point>& contour)
+	bool MarkerTracker::region_contains_contour(
+		const cv::Rect2d& region,
+		const std::vector<std::vector<cv::Point>>& regionContours,
+		const std::vector<std::vector<cv::Point>>& frameContours)
 	{
-		bool retval = true;
-		for ( auto point : contour) {
-			point.x += region.x; //fix region offset 
-			point.y += region.y;
-			if (!region.contains(point))
-			{
-				retval = false;
-				break;
-			}
-		}
-		return retval;
-	}
+		if (regionContours.size() == 0) return false;
 
+		for (const auto& fC : frameContours) {
+			double match = cv::matchShapes(regionContours.back(), fC, cv::ShapeMatchModes::CONTOURS_MATCH_I1, 0.0);
+			if (match < 0.05)
+				return true;
+		}
+
+		return false;
+	}
 
 	bool MarkerTracker::bulbVsMask(const std::vector<cv::Point>& contour, const cv::Mat& mask)
 	{

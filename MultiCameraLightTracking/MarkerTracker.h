@@ -4,7 +4,7 @@
 #include "VideoCaptureYUV.h"
 #include <vector>
 
-#define WAIT_TIME 0
+#define WAIT_TIME 1
 #define FIRST_FRAME 2
 
 
@@ -101,13 +101,16 @@ namespace bs
 			bool bBlur = true);
 		cv::Rect2d create_region(const cv::Point2d& predictedMarker, const int32_t expand = 1);
 		cv::Point2d select_marker(
-			const std::vector<cv::Point2d>& vecCurrentCenterMoments, 
-			const std::vector<std::vector<cv::Point>>& vecCurrentContours,
+			const std::vector<cv::Point2d>& vecRegionCentralMoments, 
+			const std::vector<std::vector<cv::Point>>& vecRegionContours,
 			const cv::Point2d &predictedMarker, 
 			const cv::Rect2d &predictedRegion,
 			const cv::Mat& currentMaskRegion);
 
-		bool region_contains_contour(const cv::Rect2d& region, const std::vector<cv::Point>& contour);
+		bool region_contains_contour(
+			const cv::Rect2d& region, 
+			const std::vector<std::vector<cv::Point>>& regionContours, 
+			const std::vector<std::vector<cv::Point>>& frameContours);
 
 		bool bulbVsMask(const std::vector<cv::Point>& bulbContour, const cv::Mat& mask);
 		double distance(const cv::Point2d& p1, const cv::Point2d& p2) const;

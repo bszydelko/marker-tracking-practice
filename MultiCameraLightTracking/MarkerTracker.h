@@ -4,7 +4,7 @@
 #include "VideoCaptureYUV.h"
 #include <vector>
 
-#define WAIT_TIME 1
+#define WAIT_TIME 0
 #define FIRST_FRAME 2
 
 
@@ -80,6 +80,9 @@ namespace bs
 		cv::Mat								m_imgCanny;
 		std::vector<cv::Vec4i>				m_vecContourHierarchy;
 		std::vector<cv::Moments>			m_vecMoments;
+
+
+		int32_t startFrame = 0;
 		
 
 	public:
@@ -97,8 +100,9 @@ namespace bs
 			const cv::Mat& mask,
 			std::vector<std::vector<cv::Point>> &vecCurrentContour,
 			std::vector<cv::Point2d> &vecCurrentCentralMoments,
-			int32_t thresh = 210,
-			bool bBlur = true);
+			int32_t thresh = 220,
+			bool bBlur = true,
+			bool bMorph = true);
 		cv::Rect2d create_region(const cv::Point2d& predictedMarker, const int32_t expand = 1);
 		cv::Point2d select_marker(
 			const std::vector<cv::Point2d>& vecRegionCentralMoments, 

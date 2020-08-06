@@ -9,7 +9,7 @@ int main(int argc, char** argv) //TODO - provide support for handling main param
 {
 	
 
-	std::string sCamNum = "0";
+	std::string sCamNum = "20";
 	std::string sFilename = "cam" + sCamNum + "_1920x1080.yuvdist.yuv";
 	std::string sPath = "E:\\_SEQ\\" + sCamNum +"\\";
 	//std::string sPath = "";

@@ -118,6 +118,11 @@ namespace bs
 		return int32_t(m_frameID);
 	}
 
+	int32_t VideoCaptureYUV::getNumFrames() const
+	{
+		return int32_t(m_numFrames);
+	}
+
 	cv::Size VideoCaptureYUV::getResolution() const
 	{
 		return cv::Size(m_width, m_height);

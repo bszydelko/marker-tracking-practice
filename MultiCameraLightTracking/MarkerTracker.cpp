@@ -33,14 +33,15 @@ namespace bs
 
 	int32_t MarkerTracker::start()
 	{
+		int f = 750;
 		//thresh1
-		video->read(imgCurrentFrame);
+		video->read(imgCurrentFrame,f);
 		threshold_lights(imgCurrentFrame, imgLightThresh1);
-
+		f--;
 		//thresh2
-		video->read(imgCurrentFrame);
+		video->read(imgCurrentFrame,f);
 		threshold_lights(imgCurrentFrame, imgLightThresh2);
-
+		f--;
 		create_light_mask(imgLightThresh1, imgLightThresh2, imgLightMask);
 
 		//imshow triggers
@@ -69,8 +70,9 @@ namespace bs
 		cv::waitKey(WAIT_TIME);
 
 
-		while (video->read(imgCurrentFrame))
+		while (video->read(imgCurrentFrame,f))
 		{
+			f--;
 			if (cv::waitKey(5) == 27) break; 
 
 			imgCurrentFrame.copyTo(imgRawFrame);
@@ -83,7 +85,6 @@ namespace bs
 				imgLightMask, 
 				vecFrameContours, 
 				vecFrameCentralMoments);
-			
 
 			switch (whole_frame_state)
 			{
@@ -152,17 +153,8 @@ namespace bs
 					{
 						std::cout << "region expanded not successful" << std::endl;
 					}
-
 					break;
 				}
-
-				if (m_vecMarker.size() > 0) prevMarker = m_vecMarker.back();
-				m_vecMarker.emplace_back(bs::Marker(marker, video->getFrameID()));
-				if (m_vecMarker.size() > 1)m_vecMarker.back().setMotion(&prevMarker);
-
-				
-				
-				std::cout << video->getFrameID() << " " << marker << std::endl;
 				break;
 
 			case BULB_NOT_VISIBLE: //lower thresh
@@ -172,20 +164,22 @@ namespace bs
 				// out of frame
 				// thresh to big
 
-				if (!frameBound.contains(predictedMarker)) {
-					std::cout << video->getFrameID() << "out of frame" << std::endl;
+				predictedMarker = predict_average();					
+				predictedRegion = create_region(predictedMarker,4);
+
+				/*if (!frameBound.contains(predictedMarker)) {
+					std::cout << video->getFrameID() << " out of frame" << std::endl;
 					break;
-				}
+				}*/
 
 				MARKER_STATE state = BULB_NOT_VISIBLE;
-				int32_t thresh = 205;
+				int32_t thresh = 219;
 				int32_t expand = 2;
 				int32_t attempt = 0;
-				int32_t max_attempt = 100;
+				int32_t max_attempt = 40;
 
 				while (attempt < max_attempt && state == BULB_NOT_VISIBLE)
 				{
-					predictedRegion = create_region(predictedMarker, expand);
 
 					currentMaskRegion = imgLightMask(predictedRegion);
 					currentFrameRegion = imgRawFrame(predictedRegion); 
@@ -195,14 +189,11 @@ namespace bs
 						currentMaskRegion,
 						vecRegionContours,
 						vecRegionCentralMoments,
-						thresh,
-						false);
+						thresh);
 					thresh -= 5;
 					attempt++;
 					expand++;
 
-					//if (region_contains_contour(predictedRegion, vecRegionContours, vecFrameContours))
-						//state = BULB_VISIBLE;
 				}
 				if (state == BULB_VISIBLE) {
 					marker = select_marker(
@@ -212,13 +203,22 @@ namespace bs
 						predictedRegion,
 						currentMaskRegion);
 				}
-
-
 				break;
 			}
 
 			
+			if (m_vecMarker.size() > 0) prevMarker = m_vecMarker.back();
+			if (prevMarker.m_position == marker || marker == cv::Point2d(-1, -1))
+			{
+				marker = cv::Point2d(-1, -1);
+				m_vecMarker.emplace_back(bs::Marker(marker, video->getFrameID(), false));
+			}
+			else m_vecMarker.emplace_back(bs::Marker(marker, video->getFrameID()));
+			if (m_vecMarker.size() > 1)m_vecMarker.back().setMotion(&prevMarker);
 
+
+
+			std::cout << video->getFrameID() << " " << marker << std::endl;
 
 			//new stuff
 			
@@ -272,7 +272,8 @@ namespace bs
 		std::vector<std::vector<cv::Point>> &vecCurrentContour,
 		std::vector<cv::Point2d> &vecCurrentCentralMoments,
 		int32_t thresh,
-		bool bBlur)
+		bool bBlur,
+		bool bMorph)
 	{
 		threshold_lights(frame, imgThresh);
 		cv::absdiff		(imgThresh, mask, imgBulb);
@@ -281,12 +282,14 @@ namespace bs
 		cv::dilate		(imgBulb, imgBulb, kernelDilate);
 
 		//check if another object cover mask
-		cv::Mat kernel_e = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11, 11));
+		cv::Mat kernel_e = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11,11));
 		cv::Mat kernel_d = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
 
 		cv::Mat bulb;
 		imgBulb.copyTo(bulb);
-		cv::erode(bulb, bulb, kernel_e);
+
+		if(bMorph) cv::erode(bulb, bulb, kernel_e);
+
 		for (size_t r = 0; r < frame.rows; r++)
 		{
 			for (size_t c = 0; c < frame.cols; c++)
@@ -308,7 +311,7 @@ namespace bs
 		vecCurrentCentralMoments.clear();
 		cv::Canny(
 			imgBulb, 
-			m_imgCanny, 50, 150, 3);
+			m_imgCanny, 220, 255, 3);
 		cv::findContours(
 			m_imgCanny, 
 			vecCurrentContour, 
@@ -319,7 +322,7 @@ namespace bs
 
 		auto comp_contours = [](const std::vector<cv::Point>& a, const std::vector<cv::Point>& b) -> bool
 		{
-			return cv::contourArea(a) < cv::contourArea(b); //last should be biggest
+			return cv::contourArea(a) < cv::contourArea(b) && a.size() < b.size(); //last should be biggest
 		};
 
 		std::sort(vecCurrentContour.begin(), vecCurrentContour.end(), comp_contours);
@@ -337,10 +340,12 @@ namespace bs
 			m_vecMoments.emplace_back(
 				cv::moments(vecCurrentContour[i], false)); 		//moments for each blob / contour
 			
-			vecCurrentCentralMoments.emplace_back( 
-				cv::Point2d(											//center of each blob / contour
-					m_vecMoments[i].m10 / cv::contourArea(vecCurrentContour[i]), 
-					m_vecMoments[i].m01 / cv::contourArea(vecCurrentContour[i])));
+			if (cv::contourArea(vecCurrentContour[i]) > 0.0) {
+				vecCurrentCentralMoments.emplace_back(
+					cv::Point2d(											//center of each blob / contour
+						m_vecMoments[i].m10 / m_vecMoments[i].m00,
+						m_vecMoments[i].m01 / m_vecMoments[i].m00));
+			}
 		}
 
 		if (vecCurrentContour.size() == 0) return BULB_NOT_VISIBLE;
@@ -368,21 +373,21 @@ namespace bs
 
 			for (int i = 0; i < n - 1; i++)
 			{
-
-				sum += (std::sqrt(
-					std::pow((*it).m_position.x - (*(it+1)).m_position.x, 2) +
-					std::pow((*it).m_position.y - (*(it+1)).m_position.y, 2)));
-				//sum *= 2.0;
-				//sum += (*it).m_velocity;
-				//sum += std::abs((*it).m_direction[0]) + std::abs((*it).m_direction[1]);
+				if ((*it).m_visible) {
+					sum += (std::sqrt(
+						std::pow((*it).m_position.x - (*(it + 1)).m_position.x, 2) +
+						std::pow((*it).m_position.y - (*(it + 1)).m_position.y, 2)));
+				}
+			
 				++it;
 			}
 			return sum / (double)n;
- 
-
 		};
 
 		double dim = avgDim(4) * expand;
+
+		if (dim <= 0) dim = imgCurrentFrame.size().width;
+
 		cv::Rect2d region(predictedMarker.x - dim / 2.0, predictedMarker.y - dim / 2.0, dim, dim);
 
 		if (region.width > imgCurrentFrame.size().width)

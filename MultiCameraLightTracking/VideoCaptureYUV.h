@@ -54,6 +54,7 @@ namespace bs
 		bool read(cv::Mat& dst);
 		bool read(cv::Mat& dst, int32_t frameNumber);
 		int32_t getFrameID() const;
+		int32_t getNumFrames() const;
 		cv::Size getResolution() const;
 	};
 

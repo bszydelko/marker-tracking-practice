@@ -82,7 +82,12 @@ namespace bs
 		std::vector<cv::Moments>			m_vecMoments;
 
 
-		int32_t startFrame = 0;
+		int32_t frameToReadIdx = 0;
+		int32_t frameStep = 0;
+
+
+		//output files
+		std::ofstream file_positions;
 		
 
 	public:

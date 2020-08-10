@@ -5,6 +5,8 @@ namespace bs
 	MarkerTracker::MarkerTracker(bs::VideoCaptureYUV* video)
 		: video(video)
 	{
+		
+
 		//initialize windows
 		cv::namedWindow(m_sPreviousFrame, cv::WINDOW_KEEPRATIO);
 		cv::resizeWindow(m_sPreviousFrame, video->getResolution() / 2);
@@ -32,16 +34,15 @@ namespace bs
 	}
 
 	int32_t MarkerTracker::start()
-	{
-		int f = 750;
+	{ 
 		//thresh1
-		video->read(imgCurrentFrame,f);
+		video->read(imgCurrentFrame);
 		threshold_lights(imgCurrentFrame, imgLightThresh1);
-		f--;
+		
 		//thresh2
-		video->read(imgCurrentFrame,f);
+		video->read(imgCurrentFrame);
 		threshold_lights(imgCurrentFrame, imgLightThresh2);
-		f--;
+		
 		create_light_mask(imgLightThresh1, imgLightThresh2, imgLightMask);
 
 		//imshow triggers
@@ -70,9 +71,9 @@ namespace bs
 		cv::waitKey(WAIT_TIME);
 
 
-		while (video->read(imgCurrentFrame,f))
+		while (video->read(imgCurrentFrame))
 		{
-			f--;
+			
 			if (cv::waitKey(5) == 27) break; 
 
 			imgCurrentFrame.copyTo(imgRawFrame);
@@ -218,7 +219,7 @@ namespace bs
 
 
 
-			std::cout << video->getFrameID() << " " << marker << std::endl;
+			std::cout << frameToReadIdx << " " << marker << std::endl;
 
 			//new stuff
 			

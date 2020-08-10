@@ -28,12 +28,18 @@ int main(int argc, char** argv) //TODO - provide support for handling main param
 
 	}
 
-	bs::VideoCaptureYUV video(sPath + sFilename, width, height, chromaSubsampling);
-	if (!video.isOpened()) return 0;
+	bs::VideoCaptureYUV forwardVideo(sPath + sFilename, width, height, chromaSubsampling, 1);
+	if (!forwardVideo.isOpened()) return 0;
 
-	bs::MarkerTracker tracker(&video);
-	
-	tracker.start();
+	bs::MarkerTracker forwardTracker(&forwardVideo);
+	forwardTracker.start();
+
+	bs::VideoCaptureYUV reverseVideo(sPath + sFilename, width, height, chromaSubsampling, -1);
+	if (!forwardVideo.isOpened()) return 0;
+	bs::MarkerTracker reverseTracker(&reverseVideo);
+	reverseTracker.start();
+
+
 
 
 	cv::waitKey(0);

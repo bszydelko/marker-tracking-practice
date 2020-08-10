@@ -29,8 +29,8 @@ namespace bs
 		delete[] m_Vpixels;
 	}
 	//=================================================================
-	VideoCaptureYUV::VideoCaptureYUV(const std::string& filename, int32_t width, int32_t height, int32_t chromaSubsampling)
-		: m_filename(filename), m_width(width), m_height(height), m_chromaSubsampling(chromaSubsampling)
+	VideoCaptureYUV::VideoCaptureYUV(const std::string& filename, int32_t width, int32_t height, int32_t chromaSubsampling, const int32_t frameStep)
+		: m_filename(filename), m_width(width), m_height(height), m_chromaSubsampling(chromaSubsampling), m_frameStep(frameStep)
 	{
 
 		m_file.open(m_filename, std::ios::binary);
@@ -56,7 +56,7 @@ namespace bs
 
 	bool VideoCaptureYUV::read(cv::Mat& dst)
 	{
-		if (m_file.eof()) return false;
+		if (m_file.eof() || m_frameID == m_numFrames - 1) return false;
 
 		m_file.read((char*)m_frame->m_Ypixels, m_frame->m_Ysize);
 		m_file.read((char*)m_frame->m_Upixels, m_frame->m_Usize);
@@ -112,6 +112,8 @@ namespace bs
 
 		return retVal;
 	}
+
+	
 
 	int32_t VideoCaptureYUV::getFrameID() const
 	{

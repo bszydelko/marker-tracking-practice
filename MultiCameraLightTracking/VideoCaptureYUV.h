@@ -45,14 +45,17 @@ namespace bs
 
 		int32_t m_frameID{ -1 };
 
+		int32_t m_frameStep{ 0 };
+
 	public:
 
-		VideoCaptureYUV(const std::string& filename, int32_t width, int32_t height, int32_t chromaSubsampling);
+		VideoCaptureYUV(const std::string& filename, int32_t width, int32_t height, int32_t chromaSubsampling, const int32_t frameStep);
 		~VideoCaptureYUV();
 
 		bool isOpened() { return !m_error; }
 		bool read(cv::Mat& dst);
 		bool read(cv::Mat& dst, int32_t frameNumber);
+		void setFilePointer(const int32_t frameIndex);
 		int32_t getFrameID() const;
 		int32_t getNumFrames() const;
 		cv::Size getResolution() const;

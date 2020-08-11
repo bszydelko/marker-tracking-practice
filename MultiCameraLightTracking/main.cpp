@@ -7,12 +7,10 @@
 
 int main(int argc, char** argv) //TODO - provide support for handling main parameters
 {
-	
-
-	std::string sCamNum = "20";
+	std::string sCamNum = "33";
 	std::string sFilename = "cam" + sCamNum + "_1920x1080.yuvdist.yuv";
-	//std::string sPath = "E:\\_SEQ\\" + sCamNum +"\\";
-	std::string sPath = "";
+	std::string sPath = "E:\\_SEQ\\" + sCamNum +"\\";
+	//std::string sPath = "";
 
 	int32_t width = 1920;
 	int32_t height = 1080;
@@ -28,7 +26,7 @@ int main(int argc, char** argv) //TODO - provide support for handling main param
 
 	}
 
-	bs::VideoCaptureYUV forwardVideo(sPath + sFilename, width, height, chromaSubsampling, 1);
+	bs::VideoCaptureYUV forwardVideo(sPath + sFilename, width, height, chromaSubsampling, -1);
 	if (!forwardVideo.isOpened()) return 0;
 
 	std::cout << "forward: " << std::endl;
@@ -42,9 +40,5 @@ int main(int argc, char** argv) //TODO - provide support for handling main param
 	bs::MarkerTracker reverseTracker(&reverseVideo);
 	reverseTracker.start();
 
-
-
-
-	cv::waitKey(0);
 	return 0;
 }

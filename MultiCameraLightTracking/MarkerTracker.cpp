@@ -1,5 +1,8 @@
 #include "MarkerTracker.h"
 
+
+#define SKIP_FRAMES 10
+
 namespace bs
 {
 	MarkerTracker::MarkerTracker(bs::VideoCaptureYUV* video)
@@ -34,23 +37,32 @@ namespace bs
 
 	int32_t MarkerTracker::start()
 	{ 
+		for (size_t i = 0; i < SKIP_FRAMES; i++)
+			video->read(imgCurrentFrame);
 		//thresh1
 		video->read(imgCurrentFrame);
 		threshold_lights(imgCurrentFrame, imgLightThresh1);
 		
+		for (size_t i = 0; i < SKIP_FRAMES; i++)
+			video->read(imgCurrentFrame);
+		
+
 		//thresh2
 		video->read(imgCurrentFrame);
 		threshold_lights(imgCurrentFrame, imgLightThresh2);
 		
 		create_light_mask(imgLightThresh1, imgLightThresh2, imgLightMask);
 
+		for (size_t i = 0; i < SKIP_FRAMES; i++)
+			video->read(imgCurrentFrame);
+
 		//imshow triggers
 		bool previousFrame = 0;
 		bool currentFrame = 1;
-		bool lightThresh1 = 0;
-		bool lightThresh2 = 0;
-		bool lightMask = 0;
-		bool bulb = 0;
+		bool lightThresh1 = 1;
+		bool lightThresh2 = 1;
+		bool lightMask = 1;
+		bool bulb = 1;
 		bool contoursMoments = 0;
 
 		cv::Mat currentMaskRegion;
@@ -66,13 +78,15 @@ namespace bs
 		bs::MARKER_STATE whole_frame_state;
 		bs::MARKER_STATE region_frame_state;
 		Marker prevMarker;
+  		const int32_t maxFramesToProcess = video->getNumFrames() - 1 - (4 * SKIP_FRAMES) - 4;
+		int32_t processingFrame = 0;
 
 		cv::waitKey(WAIT_TIME);
 
 
-		while (video->read(imgCurrentFrame))
+		while (video->read(imgCurrentFrame) && processingFrame <= maxFramesToProcess)
 		{
-			
+			processingFrame++;
 			if (cv::waitKey(5) == 27) break; 
 
 			imgCurrentFrame.copyTo(imgRawFrame);

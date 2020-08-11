@@ -48,11 +48,15 @@ namespace bs
 
 		//set pointer
 		if (m_frameStep == -1) {
-			m_frameID = m_numFrames - 1;
-			m_filePos = m_frameID * (m_frame->m_Ysize + m_frame->m_Usize + m_frame->m_Vsize);
+			m_frameID = m_numFrames;
+			m_filePos = (m_frameID - 1) * (m_frame->m_Ysize + m_frame->m_Usize + m_frame->m_Vsize);
 			m_file.seekg(m_filePos, std::ios::beg);
 		}
-		else m_frameID = 0;
+		else {
+			m_frameID = -1;
+			m_filePos = (m_frameID + 1) * (m_frame->m_Ysize + m_frame->m_Usize + m_frame->m_Vsize);
+			m_file.seekg(m_filePos, std::ios::beg);
+		}
 		
 	}
 
@@ -65,18 +69,17 @@ namespace bs
 	bool VideoCaptureYUV::read(cv::Mat& dst)
 	{
 		
+		if (m_file.eof())
+			return false; 
+
+		m_frameID += m_frameStep;
+		m_filePos =  m_frameID * (m_frame->m_Ysize + m_frame->m_Usize + m_frame->m_Vsize);
+		m_file.seekg(m_filePos, std::ios::beg);
 
 		m_file.read((char*)m_frame->m_Ypixels, m_frame->m_Ysize);
 		m_file.read((char*)m_frame->m_Upixels, m_frame->m_Usize);
 		m_file.read((char*)m_frame->m_Vpixels, m_frame->m_Vsize);
 
-		if (m_file.eof())
-			return false; 
-
-		m_filePos =  m_frameID * (m_frame->m_Ysize + m_frame->m_Usize + m_frame->m_Vsize);
-		m_file.seekg(m_filePos, std::ios::beg);
-
-		
 		
 		dst = cv::Mat::zeros(cv::Size(m_width, m_height), CV_8UC3);
 		float B = 0, G = 0, R = 0;
@@ -106,7 +109,7 @@ namespace bs
 		}
 
 		cv::cvtColor(dst, dst, cv::COLOR_YUV2BGR);
-		m_frameID += m_frameStep;
+		
 
 		return true;
 	}

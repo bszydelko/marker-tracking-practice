@@ -32,7 +32,6 @@ namespace bs
 	VideoCaptureYUV::VideoCaptureYUV(const std::string& filename, int32_t width, int32_t height, int32_t chromaSubsampling, const int32_t frameStep)
 		: m_filename(filename), m_width(width), m_height(height), m_chromaSubsampling(chromaSubsampling), m_frameStep(frameStep)
 	{
-
 		m_file.open(m_filename, std::ios::binary);
 
 		if (!m_file.good())
@@ -42,10 +41,19 @@ namespace bs
 		}
 		
 		m_frame = new FrameYUV(m_width, m_height, m_chromaSubsampling);
-
+		//calculate frame number
 		m_file.seekg(0, std::ios::end);
 		m_numFrames = m_file.tellg() / (m_frame->m_Ysize + m_frame->m_Usize + m_frame->m_Vsize);
 		m_file.seekg(0, std::ios::beg);
+
+		//set pointer
+		if (m_frameStep == -1) {
+			m_frameID = m_numFrames - 1;
+			m_filePos = m_frameID * (m_frame->m_Ysize + m_frame->m_Usize + m_frame->m_Vsize);
+			m_file.seekg(m_filePos, std::ios::beg);
+		}
+		else m_frameID = 0;
+		
 	}
 
 	VideoCaptureYUV::~VideoCaptureYUV()
@@ -56,14 +64,20 @@ namespace bs
 
 	bool VideoCaptureYUV::read(cv::Mat& dst)
 	{
-		if (m_file.eof() || m_frameID == m_numFrames - 1) return false;
+		
 
 		m_file.read((char*)m_frame->m_Ypixels, m_frame->m_Ysize);
 		m_file.read((char*)m_frame->m_Upixels, m_frame->m_Usize);
 		m_file.read((char*)m_frame->m_Vpixels, m_frame->m_Vsize);
 
-		
+		if (m_file.eof())
+			return false; 
 
+		m_filePos =  m_frameID * (m_frame->m_Ysize + m_frame->m_Usize + m_frame->m_Vsize);
+		m_file.seekg(m_filePos, std::ios::beg);
+
+		
+		
 		dst = cv::Mat::zeros(cv::Size(m_width, m_height), CV_8UC3);
 		float B = 0, G = 0, R = 0;
 		uint8_t Y = 0, U = 0, V = 0;
@@ -92,28 +106,10 @@ namespace bs
 		}
 
 		cv::cvtColor(dst, dst, cv::COLOR_YUV2BGR);
-		m_frameID++;
+		m_frameID += m_frameStep;
 
 		return true;
 	}
-
-	bool VideoCaptureYUV::read(cv::Mat& dst, int32_t frameIndex)
-	{
-		if (m_numFrames == 0) return false;
-
-		frameIndex = (m_numFrames + frameIndex) % m_numFrames;
-		
-		std::streampos lastPos = m_file.tellg();
-		std::streampos newPos = (m_frame->m_Ysize + m_frame->m_Usize + m_frame->m_Vsize) * frameIndex;
-		m_file.seekg(newPos, std::ios::beg);
-
-		bool retVal = this->read(dst);
-		m_file.seekg(lastPos);
-
-		return retVal;
-	}
-
-	
 
 	int32_t VideoCaptureYUV::getFrameID() const
 	{

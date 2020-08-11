@@ -5,7 +5,6 @@ namespace bs
 	MarkerTracker::MarkerTracker(bs::VideoCaptureYUV* video)
 		: video(video)
 	{
-		
 
 		//initialize windows
 		cv::namedWindow(m_sPreviousFrame, cv::WINDOW_KEEPRATIO);
@@ -50,8 +49,8 @@ namespace bs
 		bool currentFrame = 1;
 		bool lightThresh1 = 0;
 		bool lightThresh2 = 0;
-		bool lightMask = 1;
-		bool bulb = 1;
+		bool lightMask = 0;
+		bool bulb = 0;
 		bool contoursMoments = 0;
 
 		cv::Mat currentMaskRegion;
@@ -77,10 +76,8 @@ namespace bs
 			if (cv::waitKey(5) == 27) break; 
 
 			imgCurrentFrame.copyTo(imgRawFrame);
-			//new stuff
 
-			
-			
+			//new stuff
 			whole_frame_state = process_frame(
 				imgCurrentFrame, 
 				imgLightMask, 
@@ -219,7 +216,7 @@ namespace bs
 
 
 
-			std::cout << frameToReadIdx << " " << marker << std::endl;
+			std::cout << video->getFrameID() << " " << marker << std::endl;
 
 			//new stuff
 			

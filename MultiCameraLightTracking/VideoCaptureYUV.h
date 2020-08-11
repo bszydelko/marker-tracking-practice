@@ -35,6 +35,7 @@ namespace bs
 		bool m_error{ false };
 		std::ifstream m_file;
 		std::string  m_filename;
+		std::streampos m_filePos{ 0 };
 
 		int32_t m_width;
 		int32_t m_height;
@@ -43,7 +44,7 @@ namespace bs
 		FrameYUV* m_frame{ nullptr };
 		int32_t m_numFrames{ 0 };
 
-		int32_t m_frameID{ -1 };
+		int32_t m_frameID;
 
 		int32_t m_frameStep{ 0 };
 
@@ -54,8 +55,6 @@ namespace bs
 
 		bool isOpened() { return !m_error; }
 		bool read(cv::Mat& dst);
-		bool read(cv::Mat& dst, int32_t frameNumber);
-		void setFilePointer(const int32_t frameIndex);
 		int32_t getFrameID() const;
 		int32_t getNumFrames() const;
 		cv::Size getResolution() const;

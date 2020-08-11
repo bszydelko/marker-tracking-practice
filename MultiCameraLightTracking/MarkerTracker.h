@@ -5,8 +5,6 @@
 #include <vector>
 
 #define WAIT_TIME 0
-#define FIRST_FRAME 2
-
 
 namespace bs
 {
@@ -50,7 +48,6 @@ namespace bs
 		std::string m_sBulb				{ "bulb" };
 		std::string m_sContoursMoments	{ "contours & central moment" };
 
-
 		//frames
 		cv::Mat imgRawFrame;
 		cv::Mat imgFirstBulbFrame;
@@ -81,14 +78,11 @@ namespace bs
 		std::vector<cv::Vec4i>				m_vecContourHierarchy;
 		std::vector<cv::Moments>			m_vecMoments;
 
-
 		int32_t frameToReadIdx = 0;
 		int32_t frameStep = 0;
 
-
 		//output files
 		std::ofstream file_positions;
-		
 
 	public:
 
@@ -133,17 +127,6 @@ namespace bs
 			bool lightMask, 
 			bool bulb, 
 			bool contoursMoments);
-
-
 	};
-
-
-	enum STATE
-	{
-		END_OF_FILE
-
-	};
-
-	
 
 }

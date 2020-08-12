@@ -1,10 +1,10 @@
 #pragma once
 #include <string>
 #include <opencv2/opencv.hpp>
-#include "VideoCaptureYUV.h"
+#include "CaptureYUV.h"
 #include <vector>
 
-#define WAIT_TIME 0
+#define WAIT_TIME 1
 
 namespace bs
 {
@@ -58,7 +58,8 @@ namespace bs
 		cv::Mat imgLightMask;
 		cv::Mat imgContoursMoments;
 
-		bs::VideoCaptureYUV* video;
+		bs::CaptureYUV* video;
+		bs::CaptureYUV* mask;
 		uint32_t frameCounter{ 0 };
 
 		cv::Point m_bulbPos;
@@ -81,12 +82,10 @@ namespace bs
 		int32_t frameToReadIdx = 0;
 		int32_t frameStep = 0;
 
-		//output files
-		std::ofstream file_positions;
 
 	public:
 
-		MarkerTracker(bs::VideoCaptureYUV* video);
+		MarkerTracker(bs::CaptureYUV* _video, bs::CaptureYUV* _mask);
 		int32_t start();
 		~MarkerTracker();
 

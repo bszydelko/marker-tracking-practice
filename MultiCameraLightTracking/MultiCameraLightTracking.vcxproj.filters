@@ -18,18 +18,18 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="VideoCaptureYUV.cpp">
+    <ClCompile Include="MarkerTracker.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="MarkerTracker.cpp">
+    <ClCompile Include="CaptureYUV.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="VideoCaptureYUV.h">
+    <ClInclude Include="MarkerTracker.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="MarkerTracker.h">
+    <ClInclude Include="CaptureYUV.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

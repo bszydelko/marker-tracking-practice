@@ -29,7 +29,7 @@ namespace bs
 
 	};
 
-	class VideoCaptureYUV
+	class CaptureYUV
 	{
 	private:
 		bool m_error{ false };
@@ -50,14 +50,16 @@ namespace bs
 
 	public:
 
-		VideoCaptureYUV(const std::string& filename, int32_t width, int32_t height, int32_t chromaSubsampling, const int32_t frameStep);
-		~VideoCaptureYUV();
+		CaptureYUV(const std::string& filename, int32_t width, int32_t height, int32_t chromaSubsampling, const int32_t frameStep);
+		~CaptureYUV();
 
 		bool isOpened() { return !m_error; }
 		bool read(cv::Mat& dst);
 		int32_t getFrameID() const;
 		int32_t getNumFrames() const;
 		cv::Size getResolution() const;
+		std::string getFilename() const;
+		int32_t getFrameStep() const;
 	};
 
 }

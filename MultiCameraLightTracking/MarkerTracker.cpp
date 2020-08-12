@@ -5,8 +5,8 @@
 
 namespace bs
 {
-	MarkerTracker::MarkerTracker(bs::VideoCaptureYUV* video)
-		: video(video)
+	MarkerTracker::MarkerTracker(bs::CaptureYUV* _video, bs::CaptureYUV* _mask)
+		: video(_video), mask(_mask)
 	{
 
 		//initialize windows
@@ -36,31 +36,40 @@ namespace bs
 	}
 
 	int32_t MarkerTracker::start()
-	{ 
-		for (size_t i = 0; i < SKIP_FRAMES; i++)
-			video->read(imgCurrentFrame);
-		//thresh1
-		video->read(imgCurrentFrame);
+	{
+
+		std::ofstream file_pos(video->getFilename() +"\\..\\positions_" + std::to_string(video->getFrameStep()) + ".txt", std::ios::out);
+
+		//old masking
+	//
+	//	for (size_t i = 0; i < SKIP_FRAMES; i++)
+	//		video->read(imgCurrentFrame);
+	//	//thresh1
+	//	video->read(imgCurrentFrame);
+	//	threshold_lights(imgCurrentFrame, imgLightThresh1);
+	//	
+	//	for (size_t i = 0; i < SKIP_FRAMES; i++)
+	//		video->read(imgCurrentFrame);
+	//	
+
+	//	//thresh2
+	//	video->read(imgCurrentFrame);
+	//	threshold_lights(imgCurrentFrame, imgLightThresh2);
+	//	
+	//	create_light_mask(imgLightThresh1, imgLightThresh2, imgLightMask);
+
+	//	for (size_t i = 0; i < SKIP_FRAMES; i++)
+	//		video->read(imgCurrentFrame);
+
+		mask->read(imgCurrentFrame);
 		threshold_lights(imgCurrentFrame, imgLightThresh1);
-		
-		for (size_t i = 0; i < SKIP_FRAMES; i++)
-			video->read(imgCurrentFrame);
-		
-
-		//thresh2
-		video->read(imgCurrentFrame);
-		threshold_lights(imgCurrentFrame, imgLightThresh2);
-		
-		create_light_mask(imgLightThresh1, imgLightThresh2, imgLightMask);
-
-		for (size_t i = 0; i < SKIP_FRAMES; i++)
-			video->read(imgCurrentFrame);
+		create_light_mask(imgLightThresh1, imgLightThresh1, imgLightMask);
 
 		//imshow triggers
 		bool previousFrame = 0;
 		bool currentFrame = 1;
 		bool lightThresh1 = 1;
-		bool lightThresh2 = 1;
+		bool lightThresh2 = 0;
 		bool lightMask = 1;
 		bool bulb = 1;
 		bool contoursMoments = 0;
@@ -78,13 +87,13 @@ namespace bs
 		bs::MARKER_STATE whole_frame_state;
 		bs::MARKER_STATE region_frame_state;
 		Marker prevMarker;
-  		const int32_t maxFramesToProcess = video->getNumFrames() - 1 - (4 * SKIP_FRAMES) - 4;
+		const int32_t maxFramesToProcess = video->getNumFrames();
 		int32_t processingFrame = 0;
 
 		cv::waitKey(WAIT_TIME);
 
 
-		while (video->read(imgCurrentFrame) && processingFrame <= maxFramesToProcess)
+		while (video->read(imgCurrentFrame) && processingFrame < maxFramesToProcess)
 		{
 			processingFrame++;
 			if (cv::waitKey(5) == 27) break; 
@@ -230,7 +239,8 @@ namespace bs
 
 
 
-			std::cout << video->getFrameID() << " " << marker << std::endl;
+			std::cout << video->getFrameID() << " " << marker.x << " " << marker.y << std::endl;
+			file_pos << video->getFrameID() << "\t" << marker.x << "\t" << marker.y << std::endl;
 
 			//new stuff
 			

@@ -1,4 +1,4 @@
-#include "VideoCaptureYUV.h"
+#include "CaptureYUV.h"
 
 namespace bs
 {
@@ -29,7 +29,7 @@ namespace bs
 		delete[] m_Vpixels;
 	}
 	//=================================================================
-	VideoCaptureYUV::VideoCaptureYUV(const std::string& filename, int32_t width, int32_t height, int32_t chromaSubsampling, const int32_t frameStep)
+	CaptureYUV::CaptureYUV(const std::string& filename, int32_t width, int32_t height, int32_t chromaSubsampling, const int32_t frameStep)
 		: m_filename(filename), m_width(width), m_height(height), m_chromaSubsampling(chromaSubsampling), m_frameStep(frameStep)
 	{
 		m_file.open(m_filename, std::ios::binary);
@@ -60,13 +60,13 @@ namespace bs
 		
 	}
 
-	VideoCaptureYUV::~VideoCaptureYUV()
+	CaptureYUV::~CaptureYUV()
 	{
 		m_file.close();
 		delete m_frame;
 	}
 
-	bool VideoCaptureYUV::read(cv::Mat& dst)
+	bool CaptureYUV::read(cv::Mat& dst)
 	{
 		
 		if (m_file.eof())
@@ -114,19 +114,29 @@ namespace bs
 		return true;
 	}
 
-	int32_t VideoCaptureYUV::getFrameID() const
+	int32_t CaptureYUV::getFrameID() const
 	{
 		return int32_t(m_frameID);
 	}
 
-	int32_t VideoCaptureYUV::getNumFrames() const
+	int32_t CaptureYUV::getNumFrames() const
 	{
 		return int32_t(m_numFrames);
 	}
 
-	cv::Size VideoCaptureYUV::getResolution() const
+	cv::Size CaptureYUV::getResolution() const
 	{
 		return cv::Size(m_width, m_height);
+	}
+
+	std::string CaptureYUV::getFilename() const
+	{
+		return std::string(m_filename);
+	}
+
+	int32_t CaptureYUV::getFrameStep() const
+	{
+		return int32_t(m_frameStep);
 	}
 
 }

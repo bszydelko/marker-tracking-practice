@@ -38,6 +38,8 @@ namespace bs
 	{
 	private:
 		std::vector<bs::Marker> m_vecMarker;
+		std::vector<cv::Point2d> vecPoints;
+
 		
 		//window names
 		std::string m_sPreviousFrame	{ "previous frame" };
@@ -88,6 +90,8 @@ namespace bs
 		MarkerTracker(bs::CaptureYUV* _video, bs::CaptureYUV* _mask);
 		int32_t start();
 		~MarkerTracker();
+
+		std::vector<cv::Point2d> getPoints() const;
 
 	protected:
 		void threshold_lights(const cv::Mat& frame, cv::Mat& imgThresh);

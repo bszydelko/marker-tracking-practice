@@ -67,11 +67,11 @@ namespace bs
 
 		//imshow triggers
 		bool previousFrame = 0;
-		bool currentFrame = 1;
-		bool lightThresh1 = 1;
+		bool currentFrame = 0;
+		bool lightThresh1 = 0;
 		bool lightThresh2 = 0;
-		bool lightMask = 1;
-		bool bulb = 1;
+		bool lightMask = 0;
+		bool bulb = 0;
 		bool contoursMoments = 0;
 
 		cv::Mat currentMaskRegion;
@@ -89,6 +89,7 @@ namespace bs
 		Marker prevMarker;
 		const int32_t maxFramesToProcess = video->getNumFrames();
 		int32_t processingFrame = 0;
+
 
 		cv::waitKey(WAIT_TIME);
 
@@ -241,6 +242,7 @@ namespace bs
 
 			std::cout << video->getFrameID() << " " << marker.x << " " << marker.y << std::endl;
 			file_pos << video->getFrameID() << "\t" << marker.x << "\t" << marker.y << std::endl;
+			vecPoints.push_back(marker);
 
 			//new stuff
 			
@@ -260,6 +262,11 @@ namespace bs
 	MarkerTracker::~MarkerTracker()
 	{
 
+	}
+
+	std::vector<cv::Point2d> MarkerTracker::getPoints() const
+	{
+		return vecPoints;
 	}
 
 	void MarkerTracker::threshold_lights(const cv::Mat& frame, cv::Mat& imgThresh)

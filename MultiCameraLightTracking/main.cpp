@@ -7,7 +7,7 @@
 
 int main(int argc, char** argv) //TODO - provide support for handling main parameters
 {
-	std::string sCamNum = "31";
+	std::string sCamNum = "33";
 	std::string sSequence = "cam" + sCamNum + "_1920x1080.yuvdist.yuv";
 	std::string sMask = "mask_cam" + sCamNum + "_1920x1080.yuvdist.yuv";
 	std::string sPath = "E:\\_SEQ\\" + sCamNum +"\\";
@@ -72,7 +72,7 @@ int main(int argc, char** argv) //TODO - provide support for handling main param
 
 	for (size_t i = 0; i < forward_points.size(); i++)
 	{
-		if (forward_points[i] == cv::Point2d(-1, -1) || reverse_points[i] == cv::Point2d(-1, -1) || distance(forward_points[i], reverse_points[i]) >= avg_distance * 2)
+		if (forward_points[i] == cv::Point2d(-1, -1) || reverse_points[i] == cv::Point2d(-1, -1) || distance(forward_points[i], reverse_points[i]) >= avg_distance)
 			final_points.emplace_back(cv::Point2d(-1,-1));
 		else 
 			final_points.push_back(forward_points[i]);

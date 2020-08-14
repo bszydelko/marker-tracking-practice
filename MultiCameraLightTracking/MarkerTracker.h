@@ -27,11 +27,11 @@ namespace bs
 
 	enum MARKER_STATE
 	{
-		BULB_VISIBLE,
-		BULB_NOT_VISIBLE,
-		BULB_TOO_FAR,
-		BULB_OUT_OF_FRAME,
-		BULB_OVERLAPS_MASK,
+		MARKER_VISIBLE,
+		MARKER_NOT_VISIBLE,
+		MARKER_TOO_FAR,
+		MARKER_OUT_OF_FRAME,
+		MARKER_OVERLAPS_MASK,
 	};
 
 	class MarkerTracker
@@ -51,18 +51,18 @@ namespace bs
 		std::string m_sContoursMoments	{ "contours & central moment" };
 
 		//frames
-		cv::Mat imgRawFrame;
-		cv::Mat imgFirstBulbFrame;
-		cv::Mat imgPreviousFrame;
-		cv::Mat imgCurrentFrame;
-		cv::Mat imgLightThresh1;
-		cv::Mat imgLightThresh2;
-		cv::Mat imgLightMask;
-		cv::Mat imgContoursMoments;
+		cv::Mat m_imgRawFrame;
+		cv::Mat m_imgFirstBulbFrame;
+		cv::Mat m_imgPreviousFrame;
+		cv::Mat m_imgCurrentFrame;
+		cv::Mat m_imgLightThresh1;
+		cv::Mat m_imgLightThresh2;
+		cv::Mat m_imgLightMask;
+		cv::Mat m_imgContoursMoments;
 
-		bs::CaptureYUV* video;
-		bs::CaptureYUV* mask;
-		uint32_t frameCounter{ 0 };
+		bs::CaptureYUV* m_video;
+		bs::CaptureYUV* m_mask;
+		uint32_t m_frameCounter{ 0 };
 
 		cv::Point m_bulbPos;
 
@@ -71,18 +71,18 @@ namespace bs
 		int32_t m_thresh_thresholdLights{ 210 };
 
 		//fun detectLight
-		cv::Mat imgThresh;
-		cv::Mat imgBulb;
-		cv::Mat kernelDilate;
-		cv::Mat kernelErode;
-		int32_t notDetectCount{ 0 };
+		cv::Mat m_imgThresh;
+		cv::Mat m_imgBulb;
+		cv::Mat m_kernelDilate;
+		cv::Mat m_kernelErode;
+		int32_t m_notDetectCount{ 0 };
 
 		cv::Mat								m_imgCanny;
 		std::vector<cv::Vec4i>				m_vecContourHierarchy;
 		std::vector<cv::Moments>			m_vecMoments;
 
-		int32_t frameToReadIdx = 0;
-		int32_t frameStep = 0;
+		int32_t m_frameToReadIdx = 0;
+		int32_t m_frameStep = 0;
 
 
 	public:

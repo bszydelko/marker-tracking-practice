@@ -46,7 +46,7 @@ namespace bs
 
 		//imshow triggers
 		bool previousFrame = 0;
-		bool currentFrame = 0;
+		bool currentFrame = 1;
 		bool lightThresh1 = 0;
 		bool lightThresh2 = 0;
 		bool lightMask = 0;
@@ -212,17 +212,22 @@ namespace bs
 			if (m_vecMarker.size() > 1)m_vecMarker.back().setMotion(&prevMarker);
 
 
+			//drawing stuff
+			cv::circle(m_imgCurrentFrame, marker, 20, cv::Scalar(0, 255, 0), 3);
+			cv::rectangle(m_imgCurrentFrame, predictedRegion, cv::Scalar(255, 0, 255), 3);
+			cv::drawMarker(m_imgCurrentFrame, predictedMarker, cv::Scalar(0, 0, 255), cv::MarkerTypes::MARKER_CROSS, 30, 3);
+
+			imshow(previousFrame, currentFrame, lightThresh1, lightThresh2, lightMask, bulb, contoursMoments);
+
+
 			//printing stuff
 			printf("\r                                              ");
 			printf("\r \t %d / %d: %f %f", m_video->getFrameID(), m_video->getNumFrames(), marker.x, marker.y);
 			file_pos << m_video->getFrameID() << "\t" << marker.x << "\t" << marker.y << std::endl;
 			vecPoints.push_back(marker);
 
-			//drawing stuff
-			//cv::circle(m_imgCurrentFrame, marker, 20, cv::Scalar(0, 255, 0), 3);
-			//cv::rectangle(m_imgCurrentFrame, predictedRegion, cv::Scalar(255, 0, 255), 3);
-			//cv::drawMarker(m_imgCurrentFrame, predictedMarker, cv::Scalar(0, 0, 255), cv::MarkerTypes::MARKER_CROSS, 30, 3);
-			imshow(previousFrame, currentFrame, lightThresh1, lightThresh2, lightMask, bulb, contoursMoments);
+			
+			std::cout << predictedMarker << std::endl;
 
 			m_imgCurrentFrame.copyTo(m_imgPreviousFrame);
 			cv::waitKey(WAIT_TIME);

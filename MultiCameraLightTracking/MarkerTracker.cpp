@@ -1,7 +1,6 @@
 #include "MarkerTracker.h"
 
 
-#define SKIP_FRAMES 10
 
 namespace bs
 {
@@ -46,7 +45,7 @@ namespace bs
 
 		//imshow triggers
 		bool previousFrame = 0;
-		bool currentFrame = 0;
+		bool currentFrame = 1;
 		bool lightThresh1 = 0;
 		bool lightThresh2 = 0;
 		bool lightMask = 0;
@@ -219,9 +218,9 @@ namespace bs
 			vecPoints.push_back(marker);
 
 			//drawing stuff
-			//cv::circle(m_imgCurrentFrame, marker, 20, cv::Scalar(0, 255, 0), 3);
-			//cv::rectangle(m_imgCurrentFrame, predictedRegion, cv::Scalar(255, 0, 255), 3);
-			//cv::drawMarker(m_imgCurrentFrame, predictedMarker, cv::Scalar(0, 0, 255), cv::MarkerTypes::MARKER_CROSS, 30, 3);
+			cv::circle(m_imgCurrentFrame, marker, 20, cv::Scalar(0, 255, 0), 3);
+			cv::rectangle(m_imgCurrentFrame, predictedRegion, cv::Scalar(255, 0, 255), 3);
+			cv::drawMarker(m_imgCurrentFrame, predictedMarker, cv::Scalar(0, 0, 255), cv::MarkerTypes::MARKER_CROSS, 30, 3);
 			imshow(previousFrame, currentFrame, lightThresh1, lightThresh2, lightMask, bulb, contoursMoments);
 
 			m_imgCurrentFrame.copyTo(m_imgPreviousFrame);

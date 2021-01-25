@@ -4,7 +4,7 @@
 #include "CaptureYUV.h"
 #include <vector>
 
-#define WAIT_TIME 0
+#define WAIT_TIME 1
 
 namespace bs
 {
